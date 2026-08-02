@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "quiz-bot",
+    "slug": "quiz-bot",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "quizbot",
+    "userInterfaceStyle": "dark",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "extra": {
+      "github": {
+        "_comment": "Create a GitHub App at github.com/settings/apps/new. Enable Device Flow. Permissions: Contents=Read-only. Then paste the Client ID (Iv23li...) and the app slug from its URL below. Neither value is a secret; do NOT create a client secret.",
+        "clientId": "Iv23licnNVzw1nsUBm9L",
+        "appSlug": "quizbot-app"
+      }
+    }
+  }
+}
