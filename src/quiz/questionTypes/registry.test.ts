@@ -205,6 +205,36 @@ describe('short answer', () => {
     }
   });
 
+  it("honours the model's verdict, so a tolerant match doesn't need self-grading", () => {
+    for (const [outcome, score] of [['correct', 1], ['partial', 0.5], ['incorrect', 0]] as const) {
+      const grade = gradeAnswer(sa, {
+        ...shortAnswerAnswer('sys 1'),
+        judged: { outcome, reason: 'why' },
+      });
+      expect(isGraded(grade) && grade.outcome).toBe(outcome);
+      expect(isGraded(grade) && grade.score).toBe(score);
+    }
+  });
+
+  /**
+   * The user outranks the model. It is tolerant but not infallible, and being
+   * stuck with a wrong verdict would quietly corrupt the review schedule.
+   */
+  it('lets an explicit self grade overrule the model', () => {
+    const grade = gradeAnswer(sa, {
+      ...shortAnswerAnswer('sys 1', 'got-it'),
+      judged: { outcome: 'incorrect' },
+    });
+    expect(isGraded(grade) && grade.outcome).toBe('correct');
+  });
+
+  it('still self-grades when no verdict was reached', () => {
+    // gradeShortAnswer returns null when offline or unconfigured; the answer
+    // then carries no `judged` and must behave exactly as it always did.
+    const grade = gradeAnswer(sa, { ...shortAnswerAnswer('sys 1'), judged: undefined });
+    expect(grade.status).toBe('needs-self-grade');
+  });
+
   it('treats whitespace-only text as incomplete', () => {
     expect(isAnswerComplete(sa, shortAnswerAnswer('   '))).toBe(false);
     expect(isAnswerComplete(sa, shortAnswerAnswer('a'))).toBe(true);

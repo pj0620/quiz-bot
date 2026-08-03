@@ -14,8 +14,15 @@ import { MasteryDot } from '../../src/ui/components/MasteryDot';
 import { TextField } from '../../src/ui/components/TextField';
 import { colors, spacing } from '../../src/ui/theme';
 
-/** Fixed row height lets FlatList skip measurement on a large bank. */
-const ROW_HEIGHT = 76;
+/*
+  No `getItemLayout` here on purpose.
+
+  It looks like free performance, but it requires every row to be exactly the
+  height you promise, and `ListRow` wraps its subtitle to two lines — so a row
+  with a long topic list is taller than one without. A wrong `getItemLayout`
+  doesn't fail loudly; it silently corrupts scroll offsets. FlatList measures
+  variable rows correctly on its own, and this screen never jumps to an index.
+*/
 
 export default function QuestionBankScreen() {
   const router = useRouter();
@@ -73,11 +80,6 @@ export default function QuestionBankScreen() {
         style={styles.list}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        getItemLayout={(_data, index) => ({
-          length: ROW_HEIGHT,
-          offset: ROW_HEIGHT * index,
-          index,
-        })}
         ListHeaderComponent={
           <View style={styles.filters}>
             <TextField placeholder="Search questions" value={search} onChangeText={setSearch} clearButtonMode="while-editing" />

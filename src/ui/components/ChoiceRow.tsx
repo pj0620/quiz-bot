@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, radius, spacing, type } from '../theme';
+import { colors, radius, spacing, TOUCH_TARGET, type } from '../theme';
 
 /**
  * The five visual states an answer option moves through.
@@ -60,8 +60,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    padding: spacing.lg,
-    minHeight: 56,
+    // Tighter vertically than horizontally: four or five of these stack up, and
+    // the whole set needs to be visible without scrolling past the question.
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    minHeight: TOUCH_TARGET,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,

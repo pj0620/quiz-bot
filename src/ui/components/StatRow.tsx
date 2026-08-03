@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, spacing, type } from '../theme';
+import { colors, radius, spacing, type } from '../theme';
 
 export type Stat = {
   label: string;
@@ -20,14 +20,22 @@ type Props = {
   stats: Stat[];
 };
 
-/** Evenly-spaced metric row: Correct / Partial / Missed, or bank counts. */
+/**
+ * Evenly-spaced metric row: Correct / Partial / Missed, or bank counts.
+ *
+ * Sits on its own panel with hairline dividers between the figures. Floating
+ * bare on the page they read as three unrelated numbers; grouped, they read as
+ * one summary, which is what they are.
+ */
 export function StatRow({ stats }: Props) {
   return (
     <View style={styles.row}>
-      {stats.map((stat) => (
-        <View key={stat.label} style={styles.item}>
+      {stats.map((stat, index) => (
+        <View key={stat.label} style={[styles.item, index > 0 && styles.divided]}>
           <Text style={[styles.value, { color: TONE_COLORS[stat.tone ?? 'default'] }]}>{stat.value}</Text>
-          <Text style={styles.label}>{stat.label}</Text>
+          <Text style={styles.label} numberOfLines={1}>
+            {stat.label}
+          </Text>
         </View>
       ))}
     </View>
@@ -35,8 +43,16 @@ export function StatRow({ stats }: Props) {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: spacing.sm },
-  item: { flex: 1, alignItems: 'center', gap: 2 },
-  value: { ...type.heading },
-  label: { ...type.small, color: colors.textMuted, textAlign: 'center' },
+  row: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+  },
+  item: { flex: 1, alignItems: 'center', gap: 1 },
+  divided: { borderLeftWidth: 1, borderLeftColor: colors.border },
+  value: { ...type.heading, fontSize: 22 },
+  label: { ...type.small, fontSize: 12, color: colors.textMuted, textAlign: 'center' },
 });

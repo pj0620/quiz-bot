@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, type ViewStyle } from 'react-native';
 
-import { colors, radius, spacing, type } from '../theme';
+import { colors, radius, spacing, TOUCH_TARGET, type } from '../theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'plain';
 
@@ -48,7 +48,7 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 48,
+    minHeight: TOUCH_TARGET,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',

@@ -8,7 +8,7 @@ import {
   type NoteSection,
   type ParsedNote,
 } from '../../notes/parse';
-import { isNotePath, noteStem } from '../../notes/paths';
+import { isNotePath, noteFilename, noteStem } from '../../notes/paths';
 import { topicsForNote } from './noteTopics';
 import { folderOf } from './selectNotes';
 import type {
@@ -473,7 +473,7 @@ export const noteGenerator: QuestionGenerator = {
 
       onNote?.({
         path: entry.path,
-        noteTitle: entry.note.title,
+        noteTitle: noteFilename(entry.path),
         questions: noteQuestions,
       });
     }

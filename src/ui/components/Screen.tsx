@@ -48,6 +48,8 @@ export function Screen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  padded: { padding: spacing.lg },
-  scrollContent: { paddingBottom: spacing.xxl, gap: spacing.md },
+  // Less padding above than beside: the navigation header already provides
+  // separation at the top, so repeating it there just wastes a scroll.
+  padded: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  scrollContent: { paddingBottom: spacing.xl, gap: spacing.md },
 });

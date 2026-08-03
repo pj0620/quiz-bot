@@ -16,6 +16,19 @@ ensureBuiltinQuizzes();
 // rather than flashing "no key" for a frame.
 void hydrateKeyStatus();
 
+/**
+ * Anchors every route to the tabs.
+ *
+ * Without this, opening a detail route as the app's FIRST screen — a deep link,
+ * a notification, a dev link — leaves the stack with no history, so the header
+ * renders no back button and there is genuinely no way out but force-quitting.
+ * Naming the initial route makes expo-router put `(tabs)` underneath whatever
+ * was linked to, so back always leads somewhere.
+ */
+export const unstable_settings = {
+  initialRouteName: '(tabs)',
+};
+
 export default function RootLayout() {
   return (
     <SafeAreaProvider>

@@ -21,11 +21,23 @@ export type NoteName = {
 };
 
 /**
- * A standalone 1-3 digit token. Deliberately not 4+ digits, so a note named
- * "1984" or "Britain in 1970" keeps its number as part of the title rather than
- * being split into a series.
+ * The token that marks position in a series: "4", "Ch.1", "Ch1", "Pt.2", "#3".
+ *
+ * Capped at 3 digits so a note named "1984" or "Britain in 1970" keeps its
+ * number as part of the title rather than being split into a series.
  */
-const INDEX_TOKEN = /^\d{1,3}$/;
+const INDEX_TOKEN = /^(?:ch|pt|part|no|#)?\.?(\d{1,3})$/i;
+
+/**
+ * Tokens the series must have before an index is believed, when the index is
+ * the LAST thing in the name.
+ *
+ * "Thinking Fast And Slow Ch.1" has a real series and nothing after the index;
+ * "Chapter 5" has neither. Requiring two words is what separates them, and
+ * without it the second would yield a topic called "chapter" that matches
+ * every numbered note in the vault.
+ */
+const MIN_TRAILING_SERIES_TOKENS = 2;
 
 /** Separator-only tokens ("-", "–", "—", "·") between the parts. */
 const SEPARATOR = /^[-–—·|:]+$/;
@@ -49,21 +61,31 @@ export function parseNoteName(stem: string): NoteName {
   const tokens = cleaned.split(' ').filter(Boolean);
 
   for (let i = 0; i < tokens.length; i += 1) {
-    if (!INDEX_TOKEN.test(tokens[i])) continue;
+    const match = INDEX_TOKEN.exec(tokens[i]);
+    if (!match) continue;
 
     const before = tokens.slice(0, i).filter((token) => !SEPARATOR.test(token));
     const after = tokens.slice(i + 1).filter((token) => !SEPARATOR.test(token));
 
-    // Both sides must be non-empty. "Chapter 5" and "History of America 40"
-    // are left alone rather than guessed at: a series with no title after it
-    // would produce a one-word topic like "chapter", which is worse than no
-    // series at all.
-    if (before.length === 0 || after.length === 0) continue;
+    // Nothing before the number means it is an ordering prefix ("01 Intro"),
+    // not a series marker.
+    if (before.length === 0) continue;
+
+    /*
+      Nothing after the number is fine when the series is substantial.
+
+      "Thinking Fast And Slow Ch.1" is the common case: the whole name is the
+      series plus a position, and refusing to split it loses the one piece of
+      context that makes the note's contents readable — that these are notes on
+      that book. The title then falls back to the full name, which still reads
+      properly, and the series is what drives topics and the generation prompt.
+    */
+    if (after.length === 0 && before.length < MIN_TRAILING_SERIES_TOKENS) continue;
 
     return {
       series: before.join(' '),
-      index: Number.parseInt(tokens[i], 10),
-      title: after.join(' '),
+      index: Number.parseInt(match[1], 10),
+      title: after.length > 0 ? after.join(' ') : cleaned,
     };
   }
 

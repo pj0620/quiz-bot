@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Stack } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
 import { looksLikeKeyFor, type LlmProviderDefinition } from '../../src/features/llm/contract';
@@ -11,7 +11,10 @@ import { getSampleNote, SAMPLE_NOTE_PATH } from '../../src/features/llm/sampleNo
 import { removeApiKey, saveApiKey, setGeneratorId, setModel } from '../../src/features/llm/settings';
 import { useGeneratorId, useKeyStatus, useModelFor } from '../../src/features/llm/useLlm';
 import type { GeneratorId } from '../../src/features/llm/types';
+import { clearAllCoverage, coverageStore } from '../../src/quiz/generation/coverageStore';
 import { getAnswerView, getQuestionLogic } from '../../src/quiz/questionTypes';
+import { clearQuestionBank } from '../../src/quiz/store';
+import { useQuestions } from '../../src/quiz/useQuiz';
 import type { Grade, Question } from '../../src/quiz/types';
 import { Badge } from '../../src/ui/components/Badge';
 import { Button } from '../../src/ui/components/Button';
@@ -216,6 +219,61 @@ function ProviderCard({ provider }: { provider: LlmProviderDefinition }) {
   );
 }
 
+/**
+ * Emptying the bank so it can be rebuilt from scratch.
+ *
+ * Clears coverage in the same action, which is the part that is easy to get
+ * wrong: deleting the questions alone leaves every note marked "already
+ * covered", so the next generation run finds nothing to do and the bank stays
+ * empty with no explanation.
+ */
+function QuestionBankSection() {
+  const questions = useQuestions();
+  const coveredNotes = coverageStore.useSelector((state) => Object.keys(state.entries).length);
+
+  const confirm = useCallback(() => {
+    Alert.alert(
+      'Delete all questions?',
+      `This removes ${questions.length} question${questions.length === 1 ? '' : 's'}, along with your review history and any quiz in progress. Your notes and quizzes are untouched, and generation will rebuild the bank from scratch.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const { removed } = clearQuestionBank();
+            // Without this the ledger still says every note is covered.
+            clearAllCoverage();
+            Alert.alert(
+              'Bank cleared',
+              `${removed} question${removed === 1 ? '' : 's'} deleted. Generate again to rebuild it.`,
+            );
+          },
+        },
+      ],
+    );
+  }, [questions.length]);
+
+  return (
+    <Card title="Question bank">
+      <Text style={styles.hint}>
+        {questions.length} question{questions.length === 1 ? '' : 's'} · {coveredNotes} note
+        {coveredNotes === 1 ? '' : 's'} covered
+      </Text>
+      <Text style={styles.hint}>
+        Useful after changing model or prompt, when the questions already in the bank were made
+        under the old one.
+      </Text>
+      <Button
+        title="Delete all questions"
+        variant="destructive"
+        onPress={confirm}
+        disabled={questions.length === 0 && coveredNotes === 0}
+      />
+    </Card>
+  );
+}
+
 export default function SettingsScreen() {
   const generatorId = useGeneratorId();
   const providers = listLlmProviders();
@@ -251,6 +309,8 @@ export default function SettingsScreen() {
           title="About your API key"
           message="Keys are stored in the device keychain and sent only to the provider you chose. With no backend, the key lives on this device — anyone with access to an unlocked phone and the right tools could read it. Use a key with a spending limit."
         />
+
+        <QuestionBankSection />
       </Screen>
     </>
   );

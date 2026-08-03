@@ -1,6 +1,7 @@
 import { AppError } from '../../lib/errors';
 import type { ParsedNote } from '../../notes/parse';
 import { sectionText } from '../../notes/parse';
+import { noteFilename } from '../../notes/paths';
 import { topicsForNote } from '../../quiz/generation/noteTopics';
 import type { Question } from '../../quiz/types';
 import type { LlmProviderDefinition } from './contract';
@@ -39,9 +40,23 @@ export type GenerateFromNoteResult = {
   elapsedMs: number;
 };
 
-/** Room for the JSON of `count` questions, with headroom for explanations. */
+/**
+ * Output budget per note. Deliberately generous.
+ *
+ * Being generous costs nothing: both providers bill for tokens actually
+ * produced, never for the ceiling. The cap exists only to stop a runaway.
+ *
+ * And it has to be generous, because on a REASONING model this ceiling covers
+ * the model's internal reasoning as well as its reply. A budget sized for the
+ * JSON alone gets consumed by thinking before a single visible character is
+ * emitted, and that arrives as an empty completion with a "length" stop — not
+ * as an error, and not as anything the parser can make sense of. An earlier
+ * 400-tokens-per-question budget failed exactly that way on longer notes.
+ */
+const MIN_TOKEN_BUDGET = 8_000;
+
 function tokenBudget(count: number): number {
-  return Math.max(1024, count * 400);
+  return Math.max(MIN_TOKEN_BUDGET, count * 1_200);
 }
 
 /** What "From your notes" shows under a question. */
@@ -58,7 +73,8 @@ export async function generateFromNote(input: GenerateFromNoteInput): Promise<Ge
     apiKey,
     model,
     system: buildSystemPrompt(),
-    user: buildUserPrompt(note, count),
+    // The vault filename verbatim, not `note.title` — see `noteFilename`.
+    user: buildUserPrompt(note, count, noteFilename(path)),
     maxTokens: tokenBudget(count),
     json: true,
     signal,
@@ -72,7 +88,10 @@ export async function generateFromNote(input: GenerateFromNoteInput): Promise<Ge
   */
   if (completion.stopReason === 'length') {
     throw new AppError('llm_bad_response', {
-      message: `${model} hit its output limit before finishing. Try asking for fewer questions.`,
+      message:
+        completion.text.length === 0
+          ? `${model} used its entire output budget without returning anything. Reasoning models spend part of that budget thinking — try a faster model, or a shorter note.`
+          : `${model} was cut off before finishing. Try asking for fewer questions per note.`,
     });
   }
 

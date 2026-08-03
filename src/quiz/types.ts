@@ -153,7 +153,21 @@ export type SelfGrade = 'got-it' | 'close' | 'missed';
 
 export type MultipleChoiceAnswer = { format: 'multiple-choice'; choiceId: string };
 export type TrueFalseAnswer = { format: 'true-false'; value: boolean };
-export type ShortAnswerAnswer = { format: 'short-answer'; text: string; selfGrade?: SelfGrade };
+/**
+ * A verdict reached by the model rather than by the user.
+ *
+ * Stored on the answer, not computed at grade time, because it is the result of
+ * a network call: recomputing it when the results screen re-renders would mean
+ * paying again and could return a different answer.
+ */
+export type JudgedGrade = { outcome: Outcome; reason?: string };
+
+export type ShortAnswerAnswer = {
+  format: 'short-answer';
+  text: string;
+  selfGrade?: SelfGrade;
+  judged?: JudgedGrade;
+};
 export type ListRecallAnswer = { format: 'list-recall'; entries: string[] };
 export type FillBlankAnswer = { format: 'fill-blank'; values: Record<string, string> };
 

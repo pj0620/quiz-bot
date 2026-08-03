@@ -1,11 +1,8 @@
-import { readApiKey } from '../../features/llm/auth/secureKeyStore';
-import type { LlmProviderDefinition } from '../../features/llm/contract';
+import { resolveCredentials } from '../../features/llm/credentials';
 import { generateFromNote } from '../../features/llm/generateFromNote';
-import { getLlmProvider } from '../../features/llm/registry';
-import { getModelFor } from '../../features/llm/settings';
-import { AppError, toAppError } from '../../lib/errors';
+import { toAppError } from '../../lib/errors';
 import { parseNote } from '../../notes/parse';
-import { noteStem } from '../../notes/paths';
+import { noteFilename, noteStem } from '../../notes/paths';
 import type { LlmProviderId } from '../../features/llm/types';
 import type { Question } from '../types';
 import { getCoverage } from './coverageStore';
@@ -32,19 +29,6 @@ import type { GenerationInput, GenerationResult, QuestionGenerator } from './con
 
 /** How many questions to ask for per note. The model decides how many it returns. */
 const QUESTIONS_PER_NOTE = 5;
-
-async function resolveCredentials(
-  providerId: LlmProviderId,
-): Promise<{ provider: LlmProviderDefinition; apiKey: string; model: string }> {
-  const provider = getLlmProvider(providerId);
-  const apiKey = await readApiKey(providerId);
-  if (!apiKey) {
-    throw new AppError('llm_not_configured', {
-      message: `Add an ${provider.label} API key in Settings before generating.`,
-    });
-  }
-  return { provider, apiKey, model: getModelFor(providerId) || provider.defaultModel };
-}
 
 export function createLlmGenerator(providerId: LlmProviderId): QuestionGenerator {
   return {
@@ -112,7 +96,7 @@ export function createLlmGenerator(providerId: LlmProviderId): QuestionGenerator
 
           onNote?.({
             path: note.path,
-            noteTitle: parsed.title,
+            noteTitle: noteFilename(note.path),
             contentHash: note.contentHash,
             questions: outcome.questions,
             usage: outcome.usage,
@@ -130,7 +114,7 @@ export function createLlmGenerator(providerId: LlmProviderId): QuestionGenerator
           notesScanned += 1;
           onNote?.({
             path: note.path,
-            noteTitle: noteStem(note.path),
+            noteTitle: noteFilename(note.path),
             contentHash: note.contentHash,
             questions: [],
             error: appError,

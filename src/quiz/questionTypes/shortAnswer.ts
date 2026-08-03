@@ -7,18 +7,28 @@ export const shortAnswerLogic: QuestionTypeLogic<ShortAnswerQuestion> = {
   icon: 'create-outline',
 
   /**
-   * Three-step grading:
-   *   1. If the user already self-graded, honour it.
-   *   2. If the question ships `acceptable` answers, try to auto-grade a hit.
-   *   3. Otherwise hand back to the user with the model answer.
+   * Four-step grading, most authoritative first:
+   *   1. The user's own verdict, if they gave one. They can always overrule.
+   *   2. The model's verdict, when one was reached — see `gradeShortAnswer`.
+   *   3. An exact hit against `acceptable`, which needs no network call.
+   *   4. Otherwise hand back to the user with the model answer.
    *
-   * Note a *miss* against `acceptable` is NOT scored incorrect — fuzzy text
-   * matching is not good enough to fail someone on. It falls through to
-   * self-grading, so the list can only ever help, never punish.
+   * The user outranks the model on purpose. The model is tolerant but not
+   * infallible, and someone who knows they got it right must not be stuck with
+   * a wrong verdict damaging their schedule.
+   *
+   * Note a *miss* against `acceptable` is NOT scored incorrect — exact text
+   * matching is not good enough to fail someone on. It falls through, so the
+   * list can only ever help, never punish.
    */
   grade(question, answer): Grade {
     if (answer.selfGrade) {
       const outcome = outcomeFromSelfGrade(answer.selfGrade);
+      return { status: 'graded', outcome, score: outcome === 'correct' ? 1 : outcome === 'partial' ? 0.5 : 0 };
+    }
+
+    if (answer.judged) {
+      const { outcome } = answer.judged;
       return { status: 'graded', outcome, score: outcome === 'correct' ? 1 : outcome === 'partial' ? 0.5 : 0 };
     }
 

@@ -1,7 +1,7 @@
 process.env.TZ = 'America/New_York';
 
 import type { MultipleChoiceQuestion, Question, ReviewState } from '../types';
-import { bankSummary, isAtOrBelowMastery, masteryOf, topicMastery } from './mastery';
+import { isAtOrBelowMastery, masteryOf, topicMastery } from './mastery';
 import { recordReview } from './schedule';
 
 const NOW = new Date(2026, 4, 10, 12).getTime();
@@ -121,45 +121,5 @@ describe('topicMastery', () => {
 
   it('ignores questions with no topics', () => {
     expect(topicMastery([question('q1', [])], {})).toEqual([]);
-  });
-});
-
-describe('bankSummary', () => {
-  const questions: Question[] = [
-    question('new1', ['t']),
-    question('new2', ['t']),
-    question('due1', ['t']),
-    question('later', ['t']),
-  ];
-
-  const states: Record<string, ReviewState> = {
-    due1: { ...stateFrom('due1', ['correct']), dueAt: NOW - 1000 },
-    later: { ...stateFrom('later', ['correct']), dueAt: NOW + 10 * 86_400_000 },
-  };
-
-  it('separates new, due, and not-yet-due', () => {
-    const summary = bankSummary(questions, states, NOW);
-    expect(summary).toEqual({ total: 4, new: 2, due: 1, flagged: 0 });
-  });
-
-  /** A flagged question is out of circulation, so it must not inflate "due". */
-  it('counts flagged questions separately and never as due', () => {
-    const flagged: Question[] = [
-      { ...question('due1', ['t']), flagged: { reason: 'wrong', at: NOW } },
-    ];
-    const summary = bankSummary(flagged, states, NOW);
-    expect(summary.flagged).toBe(1);
-    expect(summary.due).toBe(0);
-    expect(summary.new).toBe(0);
-  });
-
-  it('never counts a leech as due', () => {
-    const leechState = { ...stateFrom('due1', Array(6).fill('incorrect')), dueAt: NOW - 1000 };
-    const summary = bankSummary([question('due1', ['t'])], { due1: leechState }, NOW);
-    expect(summary.due).toBe(0);
-  });
-
-  it('handles an empty bank', () => {
-    expect(bankSummary([], {}, NOW)).toEqual({ total: 0, new: 0, due: 0, flagged: 0 });
   });
 });

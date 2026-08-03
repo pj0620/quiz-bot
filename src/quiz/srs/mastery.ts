@@ -55,7 +55,7 @@ export type TopicMastery = {
 };
 
 /**
- * Aggregates per-topic mastery for the Today screen.
+ * Aggregates per-topic mastery.
  *
  * A question in three topics counts toward all three — topics overlap by
  * design, and splitting credit would understate every topic.
@@ -102,30 +102,4 @@ function levelFromScore(score: number): MasteryLevel {
   if (scaled >= 1.5) return 'shaky';
   if (scaled > 0) return 'learning';
   return 'new';
-}
-
-/** Counts for the Today screen header. */
-export function bankSummary(
-  questions: readonly Question[],
-  reviewStates: Readonly<Record<string, ReviewState>>,
-  now: number,
-): { total: number; new: number; due: number; flagged: number } {
-  let newCount = 0;
-  let due = 0;
-  let flagged = 0;
-
-  for (const question of questions) {
-    if (question.flagged) {
-      flagged += 1;
-      continue; // flagged questions are out of circulation, so don't count them as due
-    }
-    const state = reviewStates[question.id];
-    if (!state) {
-      newCount += 1;
-    } else if (!state.leech && now >= state.dueAt) {
-      due += 1;
-    }
-  }
-
-  return { total: questions.length, new: newCount, due, flagged };
 }

@@ -30,10 +30,38 @@ describe('parseNoteName', () => {
     expect(parseNoteName('Britain in the 70s')).toEqual({ title: 'Britain in the 70s' });
   });
 
-  it('refuses to split when nothing follows the number', () => {
-    // "Chapter" alone would be a useless topic, so no series is better.
+  it('recognises a chapter marker as the index', () => {
+    /*
+      The real-vault case. "Thinking Fast And Slow Ch.1" is entirely series plus
+      position, and failing to split it loses the one piece of context that
+      makes terse notes readable — that they are notes on that book.
+    */
+    expect(parseNoteName('Thinking Fast And Slow Ch.1')).toEqual({
+      series: 'Thinking Fast And Slow',
+      index: 1,
+      title: 'Thinking Fast And Slow Ch.1',
+    });
+  });
+
+  it('accepts the other ways a position gets written', () => {
+    expect(parseNoteName('Thinking Fast And Slow Ch1').series).toBe('Thinking Fast And Slow');
+    expect(parseNoteName('Some Long Series Pt.2').index).toBe(2);
+    expect(parseNoteName('Some Long Series #3').index).toBe(3);
+    expect(parseNoteName('Some Long Series No.4').index).toBe(4);
+  });
+
+  it('splits when nothing follows the number, if the series is substantial', () => {
+    expect(parseNoteName('History of America 40')).toEqual({
+      series: 'History of America',
+      index: 40,
+      title: 'History of America 40',
+    });
+  });
+
+  it('still refuses when a trailing number would leave a one-word series', () => {
+    // "Chapter" alone would match every numbered note in the vault.
     expect(parseNoteName('Chapter 5')).toEqual({ title: 'Chapter 5' });
-    expect(parseNoteName('History of America 40')).toEqual({ title: 'History of America 40' });
+    expect(parseNoteName('Ch.1')).toEqual({ title: 'Ch.1' });
   });
 
   it('refuses to split when nothing precedes the number', () => {

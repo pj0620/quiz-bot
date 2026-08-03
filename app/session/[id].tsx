@@ -3,6 +3,8 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { resolveCredentialsOrNull } from '../../src/features/llm/credentials';
+import { gradeShortAnswer } from '../../src/features/llm/gradeShortAnswer';
 import { getAnswerView, getQuestionLogic } from '../../src/quiz/questionTypes';
 import {
   advanceSession,
@@ -44,6 +46,8 @@ export default function SessionPlayerScreen() {
 
   /** Draft answer for the current item, before Check is pressed. */
   const [draft, setDraft] = useState<Answer | null>(null);
+  /** True while a written answer is being marked by the model. */
+  const [checking, setChecking] = useState(false);
 
   const questionById = useMemo(
     () => new Map(questions.map((question) => [question.id, question])),
@@ -71,25 +75,65 @@ export default function SessionPlayerScreen() {
     router.replace(`/session/results/${encodeURIComponent(session.id)}`);
   }, [session, router]);
 
-  const check = useCallback(() => {
+  const commit = useCallback(
+    (answer: Answer) => {
+      if (!session || !question) return;
+      const result = answerSessionItem(session.id, question.id, answer, question);
+      if (result && isGraded(result)) {
+        void answerFeedback(result.outcome);
+        // Scroll so the explanation is visible without the user hunting for it.
+        requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+      }
+    },
+    [session, question],
+  );
+
+  /*
+    A written answer is marked by the model before being committed.
+
+    Everything else grades instantly and offline, so this is the one path that
+    waits on a network call. It is bounded three ways: only for short answer,
+    only when a provider is configured, and `gradeShortAnswer` resolves to null
+    on any failure instead of throwing — so the worst case is the self-grade
+    buttons that were there before, never a stuck quiz.
+  */
+  const check = useCallback(async () => {
     if (!session || !question || !draft) return;
-    const result = answerSessionItem(session.id, question.id, draft, question);
-    if (result && isGraded(result)) {
-      void answerFeedback(result.outcome);
-      // Scroll so the explanation is visible without the user hunting for it.
-      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+
+    if (question.format !== 'short-answer' || draft.format !== 'short-answer') {
+      commit(draft);
+      return;
     }
-  }, [session, question, draft]);
+
+    setChecking(true);
+    try {
+      const credentials = await resolveCredentialsOrNull();
+      const verdict = credentials
+        ? await gradeShortAnswer({
+            question,
+            text: draft.text,
+            provider: credentials.provider,
+            apiKey: credentials.apiKey,
+            model: credentials.model,
+          })
+        : null;
+      commit(verdict ? { ...draft, judged: verdict } : draft);
+    } finally {
+      setChecking(false);
+    }
+  }, [session, question, draft, commit]);
 
   const applySelfGrade = useCallback(
     (selfGrade: SelfGrade) => {
       if (!session || !question || !draft) return;
-      const graded: Answer = { ...draft, selfGrade } as Answer;
+      // Re-answering with a self grade replaces whatever verdict was there,
+      // which is what lets the user overrule the model.
+      const graded: Answer = { ...(item?.answer ?? draft), selfGrade } as Answer;
       const result = answerSessionItem(session.id, question.id, graded, question);
       if (result && isGraded(result)) void answerFeedback(result.outcome);
       else void answerFeedback(outcomeFromSelfGrade(selfGrade));
     },
-    [session, question, draft],
+    [session, question, draft, item],
   );
 
   const next = useCallback(() => {
@@ -173,6 +217,8 @@ export default function SessionPlayerScreen() {
   const isLast = session.currentIndex >= session.items.length - 1;
   const needsSelfGrade = grade?.status === 'needs-self-grade';
   const revealed = grade !== null;
+  const judged =
+    item?.answer?.format === 'short-answer' ? item.answer.judged : undefined;
 
   return (
     <View style={styles.root}>
@@ -222,7 +268,11 @@ export default function SessionPlayerScreen() {
           <Callout
             tone={grade.outcome === 'correct' ? 'success' : 'info'}
             title={grade.outcome === 'correct' ? 'Correct' : grade.outcome === 'partial' ? 'Partly right' : 'Not quite'}
-            message={question.explanation}
+            /*
+              The model's reason first when there is one — it speaks about what
+              THIS person wrote, which the question's stock explanation cannot.
+            */
+            message={judged?.reason ? `${judged.reason}\n\n${question.explanation}` : question.explanation}
           />
         ) : null}
 
@@ -253,12 +303,26 @@ export default function SessionPlayerScreen() {
             <Button title="Got it" onPress={() => applySelfGrade('got-it')} style={styles.flexButton} />
           </View>
         ) : revealed ? (
-          <Button title={isLast ? 'See results' : 'Next'} onPress={next} />
+          <>
+            {/*
+              An override, not a second grading step. The model is tolerant but
+              can still be wrong, and being marked down for an answer you know
+              was right would quietly corrupt the schedule.
+            */}
+            {judged && !item.flagged ? (
+              <Button
+                title={judged.outcome === 'correct' ? 'I got that wrong' : 'I got that right'}
+                variant="secondary"
+                onPress={() => applySelfGrade(judged.outcome === 'correct' ? 'missed' : 'got-it')}
+              />
+            ) : null}
+            <Button title={isLast ? 'See results' : 'Next'} onPress={next} />
+          </>
         ) : (
           <Button
-            title="Check"
-            onPress={check}
-            disabled={!logic.isAnswerComplete(draft as never)}
+            title={checking ? 'Checking your answer…' : 'Check'}
+            onPress={() => void check()}
+            disabled={checking || !logic.isAnswerComplete(draft as never)}
           />
         )}
       </View>
@@ -277,9 +341,14 @@ const styles = StyleSheet.create({
   },
   progressWrap: { flex: 1, gap: spacing.xs },
   progressLabel: { ...type.small, color: colors.textMuted, textAlign: 'center' },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
-  metaRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
-  prompt: { ...type.heading, color: colors.text, lineHeight: 28 },
+  content: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+    gap: spacing.md,
+  },
+  metaRow: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
+  prompt: { ...type.heading, color: colors.text, lineHeight: 26 },
   actions: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,

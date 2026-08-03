@@ -273,7 +273,12 @@ export default function GenerateScreen() {
                     size={16}
                     color={row.error ? colors.danger : colors.success}
                   />
-                  <Text style={styles.rowTitle} numberOfLines={1}>
+                  {/*
+                    Two lines, because these are full vault filenames now and a
+                    single line cuts "Thinking Fast and Slow 11 Anchors.md" down
+                    to the part that identifies it least.
+                  */}
+                  <Text style={styles.rowTitle} numberOfLines={2}>
                     {row.title}
                   </Text>
                   <Text style={styles.rowCount}>
@@ -319,7 +324,8 @@ const styles = StyleSheet.create({
   stat: { ...type.bodyStrong, color: colors.text },
   hint: { ...type.small, color: colors.textMuted, lineHeight: 18 },
   rows: { gap: spacing.xs, marginTop: spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  // Top-aligned so the tick stays level with the first line of a wrapped filename.
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   rowTitle: { ...type.small, color: colors.text, flex: 1 },
   rowCount: { ...type.smallStrong, color: colors.textMuted },
 });

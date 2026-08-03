@@ -1,7 +1,7 @@
 import { useMemo, useSyncExternalStore } from 'react';
 
 import { bankStore, quizzesStore, reviewStore, sessionsStore } from './store';
-import { bankSummary, topicMastery, type TopicMastery } from './srs/mastery';
+import { topicMastery, type TopicMastery } from './srs/mastery';
 import { describeAvailability } from './selection/select';
 import { topicVocabulary, type TopicCount } from './topics';
 import type { Question, Quiz, QuizRule, ReviewState, Session } from './types';
@@ -65,12 +65,6 @@ export function useSession(id: string | undefined): Session | undefined {
 export function useActiveSession(): Session | undefined {
   const sessions = useSessions();
   return useMemo(() => sessions.find((session) => session.status === 'active'), [sessions]);
-}
-
-export function useBankSummary(now: number): ReturnType<typeof bankSummary> {
-  const questions = useQuestions();
-  const states = useReviewStates();
-  return useMemo(() => bankSummary(questions, states, now), [questions, states, now]);
 }
 
 export function useTopicMastery(): TopicMastery[] {

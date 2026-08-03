@@ -1,4 +1,4 @@
-import { isNotePath, noteFolder, noteStem } from './paths';
+import { isNotePath, noteFilename, noteFolder, noteStem } from './paths';
 
 describe('isNotePath', () => {
   it('accepts markdown anywhere in the vault', () => {
@@ -35,6 +35,26 @@ describe('noteStem', () => {
 
   it('leaves dots inside a name alone', () => {
     expect(noteStem('Notes/Ch. 4 Anchoring.md')).toBe('Ch. 4 Anchoring');
+  });
+});
+
+describe('noteFilename', () => {
+  it('keeps the extension and every part of the name', () => {
+    expect(noteFilename('Books/Thinking Fast and Slow 11 Anchoring.md')).toBe(
+      'Thinking Fast and Slow 11 Anchoring.md',
+    );
+  });
+
+  it('strips the folders but changes nothing else', () => {
+    // Punctuation, casing and spacing are the writer's; none of it is ours to
+    // normalise, because the model reads this as the note's identity.
+    expect(noteFilename('a/b/Podcast - Netherlands - The Revolt.md')).toBe(
+      'Podcast - Netherlands - The Revolt.md',
+    );
+  });
+
+  it('handles a note at the vault root', () => {
+    expect(noteFilename('Britain in the 70s.md')).toBe('Britain in the 70s.md');
   });
 });
 

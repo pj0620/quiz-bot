@@ -34,6 +34,22 @@ export function noteStem(path: string): string {
 }
 
 /**
+ * The filename exactly as it is in the vault, extension and all.
+ *
+ * "History/Thinking Fast and Slow 11 Anchors.md" -> "Thinking Fast and Slow 11 Anchors.md"
+ *
+ * Deliberately unparsed. A vault filename is written by hand and carries the
+ * book, the position in it, and the subject in one string — so it is the most
+ * reliable context there is, and every attempt to split it into parts is a
+ * chance to drop one. This is what the model is shown and what the UI names a
+ * note by; `noteStem` and `parseNoteName` exist for topic derivation, which is
+ * a separate job with different failure modes.
+ */
+export function noteFilename(path: string): string {
+  return path.split('/').pop() ?? path;
+}
+
+/**
  * The immediate parent directory, which in a vault is usually the subject
  * folder ("History", "Books", "Biology"). Returns null at the vault root.
  */

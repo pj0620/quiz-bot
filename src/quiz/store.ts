@@ -101,6 +101,35 @@ export function removeQuestionsForSource(sourceId: string): void {
   persistBank(questions);
 }
 
+/**
+ * Empties the bank and everything keyed to it.
+ *
+ * Deliberately one function rather than three, because a partial reset leaves
+ * the app in states that look like bugs: review states pointing at questions
+ * that no longer exist, and an "in progress" session that can never be
+ * finished. Quizzes are left alone — they are rules over the bank, not
+ * references into it, so they keep working against whatever replaces it.
+ *
+ * The COVERAGE ledger is the caller's job, and skipping it is the mistake
+ * worth guarding against: clearing the bank without clearing coverage leaves
+ * every note marked "already covered", so regeneration finds nothing to do and
+ * the bank stays empty with no explanation.
+ */
+export function clearQuestionBank(): { removed: number } {
+  const removed = bankStore.get().questions.length;
+
+  bankStore.set({ questions: [] });
+  persistBank([]);
+
+  reviewStore.set({ states: {} });
+  reviewSaver.schedule({});
+
+  sessionsStore.set({ sessions: [] });
+  sessionsSaver.schedule([]);
+
+  return { removed };
+}
+
 export function getQuestions(): Question[] {
   return bankStore.get().questions;
 }
@@ -337,7 +366,7 @@ export function getSessionById(id: string): Session | undefined {
   return sessionsStore.get().sessions.find((session) => session.id === id);
 }
 
-/** The resumable session Today surfaces, if any. */
+/** The resumable session the Stats tab surfaces, if any. */
 export function getActiveSession(): Session | undefined {
   return sessionsStore.get().sessions.find((session) => session.status === 'active');
 }

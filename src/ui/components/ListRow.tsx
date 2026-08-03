@@ -2,7 +2,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, radius, spacing, type } from '../theme';
+import { colors, radius, spacing, TOUCH_TARGET, type } from '../theme';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -30,7 +30,7 @@ export function ListRow({
     <>
       {icon ? (
         <View style={styles.iconWrap}>
-          <Ionicons name={icon} size={20} color={disabled ? colors.textFaint : colors.text} />
+          <Ionicons name={icon} size={16} color={disabled ? colors.textFaint : colors.primary} />
         </View>
       ) : null}
       <View style={styles.textWrap}>
@@ -71,18 +71,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    minHeight: 60,
+    // The tap-target floor rather than a designed height: with a title and a
+    // subtitle the content already exceeds it, so this only matters for rows
+    // that carry a title alone.
+    minHeight: TOUCH_TARGET,
   },
-  pressed: { opacity: 0.7 },
-  iconWrap: { width: 24, alignItems: 'center' },
-  textWrap: { flex: 1, gap: 2 },
-  title: { ...type.bodyStrong, color: colors.text },
+  /*
+    A fill change on press, not a fade.
+
+    Dropping opacity on a dark surface mostly makes a row look disabled; moving
+    it one step nearer the eye reads as "you touched this".
+  */
+  pressed: { backgroundColor: colors.surfaceActive, borderColor: colors.borderStrong },
+  // A tinted square rather than a bare glyph, so rows with and without icons
+  // still line their text up.
+  iconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceRaised,
+  },
+  textWrap: { flex: 1, gap: 1 },
+  title: { ...type.bodyStrong, fontSize: 15, color: colors.text },
   subtitle: { ...type.small, color: colors.textMuted },
   dimmed: { color: colors.textFaint },
 });
