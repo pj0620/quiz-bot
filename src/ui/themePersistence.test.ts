@@ -31,8 +31,9 @@ describe('theme persistence', () => {
     expect(themeStore.get()).toBe('terminal');
   });
 
+  // 'hotdog-stand' held this job until it became a real theme.
   it('ignores an unknown stored value rather than crashing into it', () => {
-    mockKv.store.set(THEME_KEY, JSON.stringify('hotdog-stand'));
+    mockKv.store.set(THEME_KEY, JSON.stringify('aero-glass'));
     initThemePersistence();
     expect(themeStore.get()).toBe(DEFAULT_THEME);
   });

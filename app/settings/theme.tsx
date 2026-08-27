@@ -12,6 +12,7 @@ import {
   setTheme,
   spacing,
   themedSheet,
+  themes,
   type,
   useThemeName,
   type ThemeDefinition,
@@ -50,16 +51,16 @@ function Swatch({ theme }: { theme: ThemeDefinition }) {
 }
 
 /**
- * The Terminal theme's screen-effect switches — the parts of the CRT look a
- * reader might want off while keeping the green. Shown only while Terminal is
- * the active theme: on any other theme both effects are inert, and a switch
- * that visibly does nothing reads as broken.
+ * The CRT themes' screen-effect switches — the parts of the look a reader
+ * might want off while keeping the phosphor. Shown only while a `crt` theme
+ * is active: on any other theme both effects are inert, and a switch that
+ * visibly does nothing reads as broken.
  */
 function TerminalFxCard() {
   const fx = terminalFxStore.use();
 
   return (
-    <Card title="Terminal effects" icon="tv-outline" accent="primary">
+    <Card title="CRT effects" icon="tv-outline" accent="primary">
       <View style={styles.fxRow}>
         <View style={styles.fxText}>
           <Text style={styles.fxLabel}>CRT screen</Text>
@@ -126,7 +127,7 @@ export default function ThemeScreen() {
           );
         })}
 
-        {current === 'terminal' ? <TerminalFxCard /> : null}
+        {themes[current].crt ? <TerminalFxCard /> : null}
       </Screen>
     </>
   );

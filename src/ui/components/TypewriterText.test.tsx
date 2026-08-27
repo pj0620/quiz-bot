@@ -99,6 +99,17 @@ describe('TypewriterText', () => {
     expect(visibleText(tree)).not.toContain('█');
   });
 
+  it('types in Amber too — the effect follows the crt flag, not the theme name', async () => {
+    setTheme('amber');
+    const tree = await render(<TypewriterText text={PROMPT} />);
+    await act(async () => {
+      jest.advanceTimersByTime(4 * 24);
+    });
+    const during = visibleText(tree);
+    expect(during.length).toBeLessThan(PROMPT.length);
+    expect(during).toContain('█');
+  });
+
   it('prints instantly when the system asks for reduced motion', async () => {
     jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
     setTheme('terminal');
