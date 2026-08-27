@@ -321,7 +321,402 @@ const xp: Palette = {
   codeText: '#47412C',
 };
 
-export type ThemeName = 'midnight' | 'terminal' | 'ink' | 'paper' | 'xp';
+/**
+ * Amber — Terminal's sibling tube, driven by the OTHER phosphor: P3 amber,
+ * the long-persistence orange of a WYSE or DEC monitor. Everything Terminal's
+ * palette comment says holds here verbatim — single hue because a
+ * single-phosphor screen IS the period look, state carried by brightness,
+ * the one dark-on-bright pairing hiding its halo against its own fill — only
+ * the phosphor changes. The CRT rig (scanlines, typewriter, squared corners)
+ * follows the `crt` flag, so this theme inherits all of it unchanged.
+ */
+const amber: Palette = {
+  background: '#160E02',
+  surfaceSunken: '#0B0701',
+  surface: '#241804',
+  surfaceRaised: '#33220A',
+  surfaceActive: '#46300E',
+  surfaceAlt: '#33220A',
+
+  border: '#5E4410',
+  borderStrong: '#A87818',
+
+  text: '#FFB000', // 10.2:1 on background
+  textMuted: '#CC8C0A', // 6.5:1
+  textFaint: '#8F6208',
+
+  primary: '#FFB000',
+  primaryText: '#1A1002',
+  primarySurface: '#3D2A05',
+
+  success: '#FFD34D',
+  successSurface: '#3D2F06',
+  warning: '#E09A10',
+  warningSurface: '#332406',
+  danger: '#B37400',
+  dangerSurface: '#2B1D04',
+
+  highlightSurface: '#3A2C08',
+
+  violet: '#FFC96B',
+  violetSurface: '#3C2C08',
+  teal: '#F0A830',
+  tealSurface: '#362708',
+  amber: '#D98E00',
+  amberSurface: '#302104',
+
+  code: '#000000',
+  codeText: '#FFB000',
+};
+
+/**
+ * Game Boy — the four shades of the DMG-01's olive LCD, the machine that
+ * called them "4 shades of gray". The famous quartet (#0F380F, #306230,
+ * #8BAC0F, #9BBC0F) can't fill a five-step neutral ladder plus accents by
+ * itself, so the extra steps are interpolated inside the same gamut — the
+ * Ink precedent, in green. The light retro theme: the GROUND is the lit
+ * screen, and everything on it is darker ink. State is carried by darkness
+ * (success darkest, danger washed) and by labels. LCD, not tube: squared
+ * corners without the `crt` scanlines.
+ */
+const gameboy: Palette = {
+  background: '#8BAC0F',
+  surfaceSunken: '#7A9A0D',
+  surface: '#9BBC0F',
+  surfaceRaised: '#A6C51C',
+  surfaceActive: '#B2CE33',
+  surfaceAlt: '#A6C51C',
+
+  border: '#306230',
+  borderStrong: '#0F380F',
+
+  text: '#0F380F', // 5.0:1 on background
+  textMuted: '#1E4E1A', // 3.6:1
+  textFaint: '#38683A',
+
+  primary: '#0F380F',
+  primaryText: '#9BBC0F',
+  primarySurface: '#7C9C10',
+
+  success: '#12400F',
+  successSurface: '#A3C22F',
+  warning: '#2A5426',
+  warningSurface: '#90AF14',
+  danger: '#3F6B33',
+  dangerSurface: '#85A311',
+
+  highlightSurface: '#B7CE4A',
+
+  violet: '#1C4A18',
+  violetSurface: '#A2C12A',
+  teal: '#265323',
+  tealSurface: '#97B81C',
+  amber: '#33602D',
+  amberSurface: '#8FB013',
+
+  code: '#8FB013',
+  codeText: '#0F380F',
+};
+
+/**
+ * Hotdog Stand — the Windows 3.1 colour scheme so notorious it became the
+ * unit of bad taste, reproduced with a straight face. Ground and cards are
+ * the reds, the primary is the mustard-yellow with black text (15:1 — the
+ * scheme was loud, not unreadable), and everything else is red-tinted white
+ * or yellow. On an all-red screen no colour can mean "danger", so state is
+ * carried by brightness and labels, the Ink/Terminal precedent. Corners
+ * square, as Program Manager drew them.
+ */
+const hotdog: Palette = {
+  background: '#A50E0E',
+  surfaceSunken: '#8C0A0A',
+  surface: '#C41414',
+  surfaceRaised: '#D62121',
+  surfaceActive: '#E63232',
+  surfaceAlt: '#D62121',
+
+  border: '#800A0A',
+  borderStrong: '#330000',
+
+  text: '#FFFFFF', // 7.9:1 on background
+  textMuted: '#FFD1CE', // 5.7:1
+  textFaint: '#E89B96',
+
+  primary: '#FFD500',
+  primaryText: '#000000',
+  primarySurface: '#4A3B00',
+
+  success: '#FFE066',
+  successSurface: '#5C4A00',
+  warning: '#FFD500',
+  warningSurface: '#52420A',
+  danger: '#FFB3AB',
+  dangerSurface: '#6E0505',
+
+  highlightSurface: '#8A5200',
+
+  violet: '#FFC2BD',
+  violetSurface: '#750808',
+  teal: '#FFE9A8',
+  tealSurface: '#66500A',
+  amber: '#FFD500',
+  amberSurface: '#5C4A00',
+
+  code: '#3D0303',
+  codeText: '#FFD98F',
+};
+
+/**
+ * System 7 — a classic Macintosh in its Platinum grays: 1-bit black type on
+ * white windows over the desktop gray, with black-fill inverse video for the
+ * primary, exactly how a selected menu item looked. Ink's light twin: no hue
+ * anywhere, state carried by darkness (success strongest, danger washed) and
+ * by labels. The corner scale is the classic Mac rounded rect — small radii
+ * everywhere and only a modest one on "pills", because the platinum era
+ * rounded corners politely, never fully.
+ */
+const system7: Palette = {
+  background: '#EDEDED',
+  surfaceSunken: '#DBDBDB',
+  surface: '#FFFFFF',
+  surfaceRaised: '#E4E4E4',
+  surfaceActive: '#D2D2D2',
+  surfaceAlt: '#E4E4E4',
+
+  border: '#8F8F8F',
+  borderStrong: '#111111',
+
+  text: '#000000', // 17.9:1 on background
+  textMuted: '#525252', // 6.7:1
+  textFaint: '#8C8C8C',
+
+  primary: '#000000',
+  primaryText: '#FFFFFF',
+  primarySurface: '#DCDCDC',
+
+  success: '#1C1C1C',
+  successSurface: '#E9E9E9',
+  warning: '#3D3D3D',
+  warningSurface: '#E0E0E0',
+  danger: '#757575',
+  dangerSurface: '#F2F2F2',
+
+  highlightSurface: '#D8D8D8',
+
+  violet: '#2A2A2A',
+  violetSurface: '#E6E6E6',
+  teal: '#404040',
+  tealSurface: '#E2E2E2',
+  amber: '#5A5A5A',
+  amberSurface: '#DEDEDE',
+
+  code: '#E2E2E2',
+  codeText: '#333333',
+};
+
+/**
+ * Synthwave — indigo night with a neon-pink sign buzzing over it. The first
+ * theme to use `glow` OUTSIDE the CRT rig: the bloom is a neon tube's, not a
+ * phosphor's, so it comes with modern corners and the system face rather
+ * than scanlines and monospace. Pink leads, cyan and violet answer it, and
+ * the semantic colours stay recognisable (green success, red danger) but
+ * neon-bright, because on this street every sign is lit.
+ */
+const synthwave: Palette = {
+  background: '#150A2E',
+  surfaceSunken: '#0D0620',
+  surface: '#1F1142',
+  surfaceRaised: '#2A1858',
+  surfaceActive: '#37216E',
+  surfaceAlt: '#2A1858',
+
+  border: '#3B2878',
+  borderStrong: '#5C3FAE',
+
+  text: '#F2EBFF', // 13.1:1 on background
+  textMuted: '#B8A3E8', // 7.9:1
+  textFaint: '#8268BE',
+
+  primary: '#FF5EDB',
+  primaryText: '#2B0A24',
+  primarySurface: '#3E1440',
+
+  success: '#4AE8A4',
+  successSurface: '#0E3A2C',
+  warning: '#FFC84A',
+  warningSurface: '#3D2E10',
+  danger: '#FF6B8B',
+  dangerSurface: '#46101F',
+
+  highlightSurface: '#3D3418',
+
+  violet: '#B18CFF',
+  violetSurface: '#2B1A54',
+  teal: '#29E6FF',
+  tealSurface: '#0B3442',
+  amber: '#FFB35C',
+  amberSurface: '#3C2810',
+
+  code: '#0A0518',
+  codeText: '#C9BCF2',
+};
+
+/**
+ * Broadsheet — a morning paper: newsprint white, true-black ink, and one
+ * masthead-red accent doing all the shouting, with the rest of the accents
+ * kept inky and reserved. Paired with the Georgia type below, because the
+ * serif IS the theme — the same mechanism that gives XP its Verdana. Print
+ * draws rules and boxes, not rounded cards, so the corner scale is zeroed:
+ * chips become the square little section tags a paper actually sets.
+ */
+const broadsheet: Palette = {
+  background: '#FAF7F0',
+  surfaceSunken: '#EEE9DD',
+  surface: '#FFFFFF',
+  surfaceRaised: '#F3EFE5',
+  surfaceActive: '#E8E2D2',
+  surfaceAlt: '#F3EFE5',
+
+  border: '#D9D3C4',
+  borderStrong: '#8A8272',
+
+  text: '#171410', // 17.4:1 on background
+  textMuted: '#5C564A', // 6.8:1
+  textFaint: '#8E8778',
+
+  primary: '#B01F24',
+  primaryText: '#FFFFFF',
+  primarySurface: '#F5DFDD',
+
+  success: '#2F6B36',
+  successSurface: '#E4EEE0',
+  warning: '#8A6100',
+  warningSurface: '#F4ECCF',
+  danger: '#A2261F',
+  dangerSurface: '#F6E0DC',
+
+  highlightSurface: '#F3E9BC',
+
+  violet: '#54488A',
+  violetSurface: '#E9E6F4',
+  teal: '#25655F',
+  tealSurface: '#DFEDEA',
+  amber: '#95560E',
+  amberSurface: '#F2E6D0',
+
+  code: '#EFEBDF',
+  codeText: '#454034',
+};
+
+/**
+ * Solarized — Ethan Schoonover's dark half, on base03/base02 with the eight
+ * canonical accents mapped onto this app's slots (green success, yellow
+ * warning, red danger, violet, cyan teal, orange amber). One honest
+ * departure: canonical base0 body text (#839496) fails WCAG AA on base02
+ * surfaces, so body text is lifted toward base2 while keeping the hue —
+ * Solarized as specified is a terminal palette, and this is a phone in
+ * daylight. Blue keeps dark text on its fill for the same reason (the
+ * Midnight trick): white on #268BD2 lands under 4:1.
+ */
+const solarized: Palette = {
+  background: '#002B36',
+  surfaceSunken: '#00212B',
+  surface: '#073642',
+  surfaceRaised: '#0A4152',
+  surfaceActive: '#0E4C5F',
+  surfaceAlt: '#0A4152',
+
+  border: '#12505F',
+  borderStrong: '#586E75',
+
+  text: '#B8C4C2', // 8.4:1 on background
+  textMuted: '#7E969B', // 4.8:1
+  textFaint: '#586E75',
+
+  primary: '#268BD2',
+  primaryText: '#00161C',
+  primarySurface: '#0B3D54',
+
+  success: '#859900',
+  successSurface: '#1D3009',
+  warning: '#B58900',
+  warningSurface: '#332B09',
+  danger: '#DC322F',
+  dangerSurface: '#3A1417',
+
+  highlightSurface: '#3A3512',
+
+  violet: '#6C71C4',
+  violetSurface: '#1C2144',
+  teal: '#2AA198',
+  tealSurface: '#0B3534',
+  amber: '#CB4B16',
+  amberSurface: '#38200D',
+
+  code: '#00181F',
+  codeText: '#93A1A1',
+};
+
+/**
+ * Nord — the arctic palette: Polar Night for the neutral ladder, Snow Storm
+ * for the type, Frost's blue-green for the primary (dark text on it — the
+ * frost blues are too light to carry white), and the Aurora reds, greens and
+ * yellows for the semantics, each over a dim wash of itself. The tasteful
+ * modern dark, for readers who find Midnight's blue too blue.
+ */
+const nord: Palette = {
+  background: '#2E3440',
+  surfaceSunken: '#272C36',
+  surface: '#3B4252',
+  surfaceRaised: '#434C5E',
+  surfaceActive: '#4C566A',
+  surfaceAlt: '#434C5E',
+
+  border: '#4C566A',
+  borderStrong: '#616E88',
+
+  text: '#ECEFF4', // 10.8:1 on background
+  textMuted: '#AEB8CA', // 6.2:1
+  textFaint: '#7B879D',
+
+  primary: '#88C0D0',
+  primaryText: '#121A24',
+  primarySurface: '#2B4552',
+
+  success: '#A3BE8C',
+  successSurface: '#37402F',
+  warning: '#EBCB8B',
+  warningSurface: '#453A25',
+  danger: '#BF616A',
+  dangerSurface: '#432730',
+
+  highlightSurface: '#4A4028',
+
+  violet: '#B48EAD',
+  violetSurface: '#3F3242',
+  teal: '#8FBCBB',
+  tealSurface: '#2C4342',
+  amber: '#D08770',
+  amberSurface: '#472F26',
+
+  code: '#232831',
+  codeText: '#D8DEE9',
+};
+
+export type ThemeName =
+  | 'midnight'
+  | 'ink'
+  | 'nord'
+  | 'solarized'
+  | 'synthwave'
+  | 'paper'
+  | 'broadsheet'
+  | 'system7'
+  | 'xp'
+  | 'terminal'
+  | 'amber'
+  | 'gameboy'
+  | 'hotdog';
 
 export type ThemeDefinition = {
   name: ThemeName;
@@ -355,6 +750,10 @@ export type ThemeDefinition = {
   statusBar: 'light' | 'dark';
 };
 
+/**
+ * Record order is picker order. Loosely grouped so thirteen rows scan:
+ * the dark palettes, the light palettes, then the machines.
+ */
 export const themes: Record<ThemeName, ThemeDefinition> = {
   midnight: {
     name: 'midnight',
@@ -363,17 +762,6 @@ export const themes: Record<ThemeName, ThemeDefinition> = {
     palette: midnight,
     monospaced: false,
     crt: false,
-    statusBar: 'light',
-  },
-  terminal: {
-    name: 'terminal',
-    label: 'Terminal',
-    description: 'Glowing green phosphor on black, all monospace — a program on an old CRT.',
-    palette: terminal,
-    monospaced: true,
-    crt: true,
-    // Alpha keeps the bloom a haze rather than a second glyph behind the first.
-    glow: 'rgba(51, 255, 51, 0.55)',
     statusBar: 'light',
   },
   ink: {
@@ -385,6 +773,35 @@ export const themes: Record<ThemeName, ThemeDefinition> = {
     crt: false,
     statusBar: 'light',
   },
+  nord: {
+    name: 'nord',
+    label: 'Nord',
+    description: 'Arctic slate blue with frost and aurora accents.',
+    palette: nord,
+    monospaced: false,
+    crt: false,
+    statusBar: 'light',
+  },
+  solarized: {
+    name: 'solarized',
+    label: 'Solarized',
+    description: 'The famous blue-green dark, canonical accents and all.',
+    palette: solarized,
+    monospaced: false,
+    crt: false,
+    statusBar: 'light',
+  },
+  synthwave: {
+    name: 'synthwave',
+    label: 'Synthwave',
+    description: 'Neon pink glowing over indigo night. An 80s that never happened.',
+    palette: synthwave,
+    monospaced: false,
+    crt: false,
+    // A neon tube's bloom, not a phosphor's: glow without the CRT rig.
+    glow: 'rgba(255, 94, 219, 0.45)',
+    statusBar: 'light',
+  },
   paper: {
     name: 'paper',
     label: 'Paper',
@@ -392,6 +809,30 @@ export const themes: Record<ThemeName, ThemeDefinition> = {
     palette: paper,
     monospaced: false,
     crt: false,
+    statusBar: 'dark',
+  },
+  broadsheet: {
+    name: 'broadsheet',
+    label: 'Broadsheet',
+    description: 'Newsprint white and serif black with one masthead-red accent.',
+    palette: broadsheet,
+    monospaced: false,
+    crt: false,
+    // The serif is the theme. Georgia ships on iOS; elsewhere, system face.
+    fontFamily: Platform.select({ ios: 'Georgia', default: undefined }),
+    // Print draws rules and boxes; nothing on a broadsheet page is rounded.
+    radii: { sm: 0, md: 0, lg: 0, xl: 0, pill: 0 },
+    statusBar: 'dark',
+  },
+  system7: {
+    name: 'system7',
+    label: 'System 7',
+    description: 'Platinum and 1-bit black on white, like a classic Macintosh.',
+    palette: system7,
+    monospaced: false,
+    crt: false,
+    // The classic Mac rounded rect: polite small radii, pills included.
+    radii: { sm: 3, md: 4, lg: 5, xl: 6, pill: 8 },
     statusBar: 'dark',
   },
   xp: {
@@ -409,6 +850,49 @@ export const themes: Record<ThemeName, ThemeDefinition> = {
     // XP's "pills" (taskbar buttons, chips) were 4px rectangles.
     radii: { sm: 2, md: 3, lg: 6, xl: 8, pill: 4 },
     statusBar: 'dark',
+  },
+  terminal: {
+    name: 'terminal',
+    label: 'Terminal',
+    description: 'Glowing green phosphor on black, all monospace — a program on an old CRT.',
+    palette: terminal,
+    monospaced: true,
+    crt: true,
+    // Alpha keeps the bloom a haze rather than a second glyph behind the first.
+    glow: 'rgba(51, 255, 51, 0.55)',
+    statusBar: 'light',
+  },
+  amber: {
+    name: 'amber',
+    label: 'Amber',
+    description: 'The other phosphor: glowing amber on black, same CRT, same monospace.',
+    palette: amber,
+    monospaced: true,
+    crt: true,
+    glow: 'rgba(255, 176, 0, 0.55)',
+    statusBar: 'light',
+  },
+  gameboy: {
+    name: 'gameboy',
+    label: 'Game Boy',
+    description: 'The four olive-green shades of the original handheld LCD.',
+    palette: gameboy,
+    monospaced: true,
+    crt: false,
+    // An LCD has hard square cells but no scanlines: corners without the rig.
+    radii: { sm: 0, md: 0, lg: 0, xl: 0, pill: 0 },
+    statusBar: 'dark',
+  },
+  hotdog: {
+    name: 'hotdog',
+    label: 'Hotdog Stand',
+    description: 'Red, yellow, black. The infamous Windows 3.1 scheme, worn proudly.',
+    palette: hotdog,
+    monospaced: false,
+    crt: false,
+    // Program Manager drew rectangles.
+    radii: { sm: 0, md: 0, lg: 0, xl: 0, pill: 0 },
+    statusBar: 'light',
   },
 };
 

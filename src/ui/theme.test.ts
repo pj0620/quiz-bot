@@ -35,9 +35,24 @@ function contrast(a: string, b: string): number {
 describe('themes', () => {
   it('knows its own names', () => {
     expect(isThemeName('terminal')).toBe(true);
-    expect(isThemeName('solarized')).toBe(false);
+    expect(isThemeName('aqua')).toBe(false);
     expect(isThemeName(undefined)).toBe(false);
-    expect(listThemes().map((theme) => theme.name)).toEqual(['midnight', 'terminal', 'ink', 'paper', 'xp']);
+    // Record order is picker order: dark, light, then the machines.
+    expect(listThemes().map((theme) => theme.name)).toEqual([
+      'midnight',
+      'ink',
+      'nord',
+      'solarized',
+      'synthwave',
+      'paper',
+      'broadsheet',
+      'system7',
+      'xp',
+      'terminal',
+      'amber',
+      'gameboy',
+      'hotdog',
+    ]);
   });
 
   /*
@@ -70,9 +85,12 @@ describe('themes', () => {
     expect(accents.primary.fg).toBe(themes.terminal.palette.primary);
   });
 
-  it('sets the whole type scale in monospace for Terminal, and only for it', () => {
+  it('sets the whole type scale in monospace for the machine themes', () => {
     setTheme('terminal');
     expect(type.body.fontFamily).toBeDefined();
+    expect(type.display.fontFamily).toBe(type.mono.fontFamily);
+
+    setTheme('amber');
     expect(type.display.fontFamily).toBe(type.mono.fontFamily);
 
     setTheme('paper');
@@ -81,16 +99,27 @@ describe('themes', () => {
     expect(type.mono.fontFamily).toBeDefined();
   });
 
-  it('gives Terminal glowing glyphs and square corners, and only Terminal', () => {
+  it('gives the CRT themes glowing glyphs and square corners', () => {
     setTheme('terminal');
     expect(type.body.textShadowColor).toBe(themes.terminal.glow);
     expect(type.display.textShadowRadius).toBeGreaterThan(0);
     expect(radius.lg).toBe(0);
     expect(radius.pill).toBe(0);
 
+    setTheme('amber');
+    expect(type.body.textShadowColor).toBe(themes.amber.glow);
+    expect(radius.pill).toBe(0);
+
     setTheme('midnight');
     expect(type.body.textShadowColor).toBeUndefined();
     expect(radius.lg).toBeGreaterThan(0);
+    expect(radius.pill).toBeGreaterThan(0);
+  });
+
+  it('lets Synthwave glow without the rest of the CRT rig', () => {
+    setTheme('synthwave');
+    expect(type.body.textShadowColor).toBe(themes.synthwave.glow);
+    expect(type.body.fontFamily).toBeUndefined();
     expect(radius.pill).toBeGreaterThan(0);
   });
 
@@ -109,12 +138,21 @@ describe('themes', () => {
     expect(radius.pill).toBe(999);
   });
 
-  it('keeps the dramatics out of the other themes entirely', () => {
+  /*
+    Which themes get the dramatic machinery is an explicit contract, not an
+    accident of authoring: `crt` is the whole tube (scanlines, typewriter,
+    squared corners), `monospaced` is the machine face, `glow` is bloom of
+    any kind. A theme growing one of these without being listed here is a
+    bug, however good it looks.
+  */
+  it('grants the dramatics to exactly the themes that earn them', () => {
+    const crt = ['terminal', 'amber'];
+    const monospaced = ['terminal', 'amber', 'gameboy'];
+    const glowing = ['terminal', 'amber', 'synthwave'];
     for (const theme of listThemes()) {
-      if (theme.name === 'terminal') continue;
-      expect(theme.crt).toBe(false);
-      expect(theme.glow).toBeUndefined();
-      expect(theme.monospaced).toBe(false);
+      expect(theme.crt).toBe(crt.includes(theme.name));
+      expect(theme.monospaced).toBe(monospaced.includes(theme.name));
+      expect(theme.glow !== undefined).toBe(glowing.includes(theme.name));
     }
   });
 
