@@ -28,3 +28,13 @@ iOS only. `android` in `app.json` has no `package` set, so Android cannot build.
 
 `notes-clone/` is a local Obsidian vault used as test data. It is gitignored and
 is not present in a fresh clone. Do not depend on it, and never commit it.
+
+Submission is configured non-interactively in `eas.json` (`ascAppId`,
+`appleTeamId`). Without those, a submit job on an EAS worker fails at
+"Prepare credentials", because resolving the App Store Connect app needs a
+prompt that no worker can answer.
+
+`deploy.yml` cannot retry a failed submit: once a build exists for the current
+fingerprint, `get-build` finds it, `build_ios` is skipped, and `submit_ios` is
+skipped along with it. Use `submit.yml` with a build ID to submit a binary that
+already exists.

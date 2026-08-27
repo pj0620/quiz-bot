@@ -1,0 +1,22 @@
+name: Submit an existing build
+
+# deploy.yml cannot retry a failed submit. Once a build exists for the current
+# fingerprint, its get-build job finds that build, skips build_ios, and so skips
+# submit_ios too — the run takes the OTA branch instead. This workflow is the
+# retry path: it submits a binary that has already been built.
+#
+#   eas workflow:run .eas/workflows/submit.yml -F build_id=<id>
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        type: string
+        required: true
+        description: 'EAS build ID to submit (from `eas build:list`)'
+
+jobs:
+  submit:
+    name: Submit to TestFlight
+    type: submit
+    params:
+      build_id: ${{ inputs.build_id }}
