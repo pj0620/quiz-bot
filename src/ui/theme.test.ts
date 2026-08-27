@@ -37,7 +37,7 @@ describe('themes', () => {
     expect(isThemeName('terminal')).toBe(true);
     expect(isThemeName('solarized')).toBe(false);
     expect(isThemeName(undefined)).toBe(false);
-    expect(listThemes().map((theme) => theme.name)).toEqual(['midnight', 'terminal', 'ink', 'paper']);
+    expect(listThemes().map((theme) => theme.name)).toEqual(['midnight', 'terminal', 'ink', 'paper', 'xp']);
   });
 
   /*
@@ -92,6 +92,21 @@ describe('themes', () => {
     expect(type.body.textShadowColor).toBeUndefined();
     expect(radius.lg).toBeGreaterThan(0);
     expect(radius.pill).toBeGreaterThan(0);
+  });
+
+  it('gives XP its Luna face — the themed family and the tight corners — and takes both back', () => {
+    setTheme('xp');
+    // The whole UI scale moves to the theme's family; code stays mono.
+    expect(type.body.fontFamily).toBe(themes.xp.fontFamily);
+    expect(type.display.fontFamily).toBe(themes.xp.fontFamily);
+    expect(type.mono.fontFamily).not.toBe(themes.xp.fontFamily);
+    // XP's own corner scale, not the modern default and not CRT-square.
+    expect(radius.md).toBe(themes.xp.radii?.md);
+    expect(radius.pill).toBe(themes.xp.radii?.pill);
+
+    setTheme('midnight');
+    expect(type.body.fontFamily).toBeUndefined();
+    expect(radius.pill).toBe(999);
   });
 
   it('keeps the dramatics out of the other themes entirely', () => {

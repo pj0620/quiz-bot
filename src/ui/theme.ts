@@ -271,7 +271,57 @@ const paper: Palette = {
   codeText: '#4A3F2A',
 };
 
-export type ThemeName = 'midnight' | 'terminal' | 'ink' | 'paper';
+/**
+ * XP — Windows XP's Luna, the Bliss-era desktop: warm `#ECE9D8` dialog beige
+ * for the ground, white list-view windows on top of it, and the title-bar
+ * blue as the accent. The greys are XP's own 3D-edge greys (`#ACA899`), the
+ * field borders the blue-grey every XP text box wore, and the highlight the
+ * tooltip yellow. Green and red keep their Luna voices (Start-button green,
+ * error-dialog red). Paired with the Verdana type and the tight corner scale
+ * below — Luna rounded a button 3px, not 14 — so it reads as drawn by that
+ * machine, not merely coloured like it.
+ */
+const xp: Palette = {
+  background: '#ECE9D8',
+  surfaceSunken: '#E2DEC9',
+  surface: '#FFFFFF',
+  surfaceRaised: '#F1EFE2',
+  surfaceActive: '#DCE4F5',
+  surfaceAlt: '#F1EFE2',
+
+  border: '#ACA899',
+  borderStrong: '#7F9DB9',
+
+  text: '#1C1A15', // 13.9:1 on background
+  textMuted: '#6B675C', // 4.6:1
+  textFaint: '#918C7D',
+
+  // The Luna title-bar blue, white text on it exactly as the caption bar had.
+  primary: '#0054E3',
+  primaryText: '#FFFFFF',
+  primarySurface: '#D6E5F8',
+
+  success: '#2F7D2F',
+  successSurface: '#DFEED8',
+  warning: '#8A6100',
+  warningSurface: '#F7ECC5',
+  danger: '#C42B1C',
+  dangerSurface: '#F7DEDA',
+
+  highlightSurface: '#F5EDB8',
+
+  violet: '#6A4FB6',
+  violetSurface: '#E9E4F6',
+  teal: '#0E756D',
+  tealSurface: '#DCEEEB',
+  amber: '#B45309',
+  amberSurface: '#F5E8CF',
+
+  code: '#E9E5D2',
+  codeText: '#47412C',
+};
+
+export type ThemeName = 'midnight' | 'terminal' | 'ink' | 'paper' | 'xp';
 
 export type ThemeDefinition = {
   name: ThemeName;
@@ -289,6 +339,18 @@ export type ThemeDefinition = {
   crt: boolean;
   /** Every glyph blooms in this colour, via the type scale. Phosphor, in css. */
   glow?: string;
+  /**
+   * Sets the ENTIRE type scale in this family, the way `monospaced` does for
+   * the mono family (which wins if both are set — mono IS the point there).
+   * The `mono`/code token is not touched: code stays code in every theme.
+   */
+  fontFamily?: string;
+  /**
+   * A corner scale of the theme's own, for a period look the modern scale
+   * would betray — XP rounded a button 3px. `crt` still squares everything
+   * to zero; themes without an opinion get the modern default.
+   */
+  radii?: RadiusScale;
   /** Status-bar content that stays readable on `palette.background`. */
   statusBar: 'light' | 'dark';
 };
@@ -330,6 +392,22 @@ export const themes: Record<ThemeName, ThemeDefinition> = {
     palette: paper,
     monospaced: false,
     crt: false,
+    statusBar: 'dark',
+  },
+  xp: {
+    name: 'xp',
+    label: 'Windows XP',
+    description: 'Luna: title-bar blue on warm beige, white windows. It is 2001.',
+    palette: xp,
+    monospaced: false,
+    crt: false,
+    // Tahoma is what Luna actually wore, but iOS does not ship it; Verdana is
+    // the same designer's screen face and does. Elsewhere, no override — the
+    // system face beats a sans that only resembles the wrong one.
+    fontFamily: Platform.select({ ios: 'Verdana', default: undefined }),
+    // Luna's corners: 3px controls, 8px window tops, nothing remotely a pill —
+    // XP's "pills" (taskbar buttons, chips) were 4px rectangles.
+    radii: { sm: 2, md: 3, lg: 6, xl: 8, pill: 4 },
     statusBar: 'dark',
   },
 };
@@ -379,9 +457,9 @@ export function setTheme(name: ThemeName): void {
   if (themeStore.get() === name) return;
   const theme = themes[name];
   Object.assign(colors, theme.palette);
-  Object.assign(type, buildType(theme.monospaced, theme.glow));
+  Object.assign(type, buildType(theme.monospaced, theme.glow, theme.fontFamily));
   Object.assign(accents, buildAccents(theme.palette));
-  Object.assign(radius, buildRadius(theme.crt));
+  Object.assign(radius, buildRadius(theme));
   themeStore.set(name);
 }
 
@@ -481,19 +559,21 @@ export const TOUCH_TARGET = 44;
 export type RadiusScale = Record<'sm' | 'md' | 'lg' | 'xl' | 'pill', number>;
 
 /**
- * Corner radii — themed, because the CRT theme squares every corner off.
+ * Corner radii — themed, because period looks live or die on corners.
  *
  * Rounded rectangles are a firmly post-phosphor idea; a terminal drew cells,
  * and even its "pills" (chips, badges) were inverse-video rectangles. Zeroing
  * the whole scale is what makes Terminal read as drawn BY that machine rather
- * than skinned to resemble one. Every other theme keeps the modern scale.
+ * than skinned to resemble one. A theme can instead bring its own scale
+ * (`radii` — XP's 2–8px), and everything else keeps the modern default.
  */
-function buildRadius(square: boolean): RadiusScale {
-  if (square) return { sm: 0, md: 0, lg: 0, xl: 0, pill: 0 };
+function buildRadius(theme: ThemeDefinition): RadiusScale {
+  if (theme.crt) return { sm: 0, md: 0, lg: 0, xl: 0, pill: 0 };
+  if (theme.radii) return { ...theme.radii };
   return { sm: 6, md: 10, lg: 14, xl: 18, pill: 999 };
 }
 
-export const radius: RadiusScale = buildRadius(themes[DEFAULT_THEME].crt);
+export const radius: RadiusScale = buildRadius(themes[DEFAULT_THEME]);
 
 /**
  * Shadows, iOS-first.
@@ -534,8 +614,10 @@ export type TypeScale = Record<
  *
  * `monospaced` sets every token in the mono family and zeroes the negative
  * tracking (tightened letterspacing is a trick for grotesque display faces;
- * on a fixed-pitch face it just makes glyphs collide). Sizes and weights stay
- * put across themes, so nothing reflows further than the wider glyphs demand.
+ * on a fixed-pitch face it just makes glyphs collide). `family` does the same
+ * swap into a named face (XP's Verdana) without touching the tracking; the
+ * mono flag wins if both are set. Sizes and weights stay put across themes,
+ * so nothing reflows further than the wider glyphs demand.
  *
  * `glow` bakes a zero-offset text shadow into every token — phosphor bloom,
  * scaled to the glyph (a 34px character excites more of the tube than an 11px
@@ -543,8 +625,8 @@ export type TypeScale = Record<
  * app glows without a single component change; safe only because Terminal's
  * glow is its own hue on its own single-hue screen (see the palette comment).
  */
-function buildType(monospaced: boolean, glow?: string): TypeScale {
-  const family = monospaced ? { fontFamily: MONO_FAMILY } : {};
+function buildType(monospaced: boolean, glow?: string, uiFamily?: string): TypeScale {
+  const family = monospaced ? { fontFamily: MONO_FAMILY } : uiFamily ? { fontFamily: uiFamily } : {};
   const track = (value: number) => (monospaced ? {} : { letterSpacing: value });
   const bloom = (spread: number) =>
     glow
@@ -569,6 +651,7 @@ function buildType(monospaced: boolean, glow?: string): TypeScale {
 export const type: TypeScale = buildType(
   themes[DEFAULT_THEME].monospaced,
   themes[DEFAULT_THEME].glow,
+  themes[DEFAULT_THEME].fontFamily,
 );
 
 /** The accent set a section header or card can be tinted with. */
