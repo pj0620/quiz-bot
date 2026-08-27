@@ -38,3 +38,16 @@ prompt that no worker can answer.
 fingerprint, `get-build` finds it, `build_ios` is skipped, and `submit_ios` is
 skipped along with it. Use `submit.yml` with a build ID to submit a binary that
 already exists.
+
+# Dependencies
+
+`patches/expo-modules-jsi+57.0.4.patch` is pinned to that exact version, and
+`patch-package` runs on `postinstall`. Upgrading `expo` moves that transitive
+version, the patch stops applying, and **every EAS build fails during
+`npm install`** — a failure that does not reproduce against an existing
+`node_modules`.
+
+So do not run `npx expo install --check` or upgrade Expo packages as
+incidental cleanup. Several packages are knowingly behind. Upgrading is its own
+task: regenerate the patch, confirm it applies from a clean install, and expect
+a rebuild.
