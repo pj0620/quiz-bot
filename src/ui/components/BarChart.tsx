@@ -1,6 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { colors, radius, spacing, type } from '../theme';
+import { colors, radius, spacing, themedSheet, type } from '../theme';
 
 export type Bar = {
   /** Drives the height, relative to the largest value in the set. */
@@ -67,7 +67,7 @@ export function BarChart({ bars, height = 90, maxLabel, emptyMessage }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   wrapper: { gap: spacing.xs },
   max: { ...type.small, color: colors.textFaint },
   plot: { flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
@@ -79,4 +79,4 @@ const styles = StyleSheet.create({
   highlightLabel: { color: colors.primary },
   empty: { alignItems: 'center', justifyContent: 'center' },
   emptyText: { ...type.small, color: colors.textFaint },
-});
+}));

@@ -1,7 +1,8 @@
-import { forwardRef } from 'react';
-import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import {
+  forwardRef } from 'react';
+import { Text, TextInput, View, type TextInputProps } from 'react-native';
 
-import { colors, radius, spacing, type } from '../theme';
+import { colors, radius, spacing, themedSheet, type } from '../theme';
 
 type Props = Omit<TextInputProps, 'style'> & {
   label?: string;
@@ -46,7 +47,7 @@ export const TextField = forwardRef<TextInput, Props>(function TextField(
   );
 });
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   wrapper: { gap: spacing.xs },
   label: { ...type.smallStrong, color: colors.textMuted },
   input: {
@@ -63,4 +64,4 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 96, paddingTop: spacing.md, textAlignVertical: 'top' },
   errored: { borderColor: colors.danger },
   error: { ...type.small, color: colors.danger },
-});
+}));

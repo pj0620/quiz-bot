@@ -1,7 +1,12 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Ionicons } from '@expo/vector-icons';
+import { Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 
-import { colors, radius, spacing, type } from '../theme';
+import { colors, radius, spacing, themedSheet, type } from '../theme';
 
 type ChipProps = {
   label: string;
@@ -61,7 +66,7 @@ export function ChipGroup({ children, scroll = false }: GroupProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -82,4 +87,4 @@ const styles = StyleSheet.create({
   selectedCount: { color: colors.primaryText, opacity: 0.8 },
   wrapGroup: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   scrollGroup: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.lg },
-});
+}));

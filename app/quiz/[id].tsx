@@ -1,14 +1,31 @@
-import { useCallback, useMemo } from 'react';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import {
+  useCallback,
+  useMemo } from 'react';
+import { Stack,
+  useLocalSearchParams,
+  useRouter } from 'expo-router';
+import { Alert,
+  Text,
+  View,
+} from 'react-native';
 
 import { formatTopic } from '../../src/quiz/topics';
 import { describeDraw, describeMix, describeRule } from '../../src/quiz/selection/describeRule';
 import { describeAvailability } from '../../src/quiz/selection/select';
+import { useSelectionMode } from '../../src/quiz/preferences';
 import { masteryOf } from '../../src/quiz/srs/mastery';
 import { startQuizSession } from '../../src/quiz/startSession';
 import { removeQuiz } from '../../src/quiz/store';
-import { useQuestions, useQuiz, useReviewStates, useSessions } from '../../src/quiz/useQuiz';
+import {
+  useQuiz,
+  useReviewStates,
+  useSelectableQuestions,
+  useSessions,
+} from '../../src/quiz/useQuiz';
+import { useEnabledCalendarSubjects } from '../../src/quiz/calendar/preferences';
+import { CALENDAR_TOPIC } from '../../src/quiz/calendar/types';
+import { useEnabledSubjects } from '../../src/quiz/geography/preferences';
+import { GEOGRAPHY_TOPIC } from '../../src/quiz/geography/types';
 import { matchesRule } from '../../src/quiz/selection/matchesRule';
 import { MASTERY_ORDER } from '../../src/quiz/srs/mastery';
 import { sessionScore } from '../../src/quiz/types';
@@ -23,13 +40,14 @@ import { ProgressBar } from '../../src/ui/components/ProgressBar';
 import { Screen } from '../../src/ui/components/Screen';
 import { SectionHeader } from '../../src/ui/components/SectionHeader';
 import { StatRow } from '../../src/ui/components/StatRow';
-import { colors, spacing, type } from '../../src/ui/theme';
+import { colors, spacing, themedSheet, type } from '../../src/ui/theme';
 
 export default function QuizDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
   const quiz = useQuiz(typeof params.id === 'string' ? params.id : undefined);
-  const questions = useQuestions();
+  // Bank plus enabled geography — see `useSelectableQuestions`.
+  const questions = useSelectableQuestions();
   const reviewStates = useReviewStates();
   const sessions = useSessions();
   const now = Date.now();
@@ -38,6 +56,25 @@ export default function QuizDetailScreen() {
     () => Object.fromEntries(getSources().map((source) => [source.id, source.fullName])),
     [],
   );
+
+  const selectionMode = useSelectionMode();
+
+  /*
+    An empty quiz that only Settings can fill.
+
+    True when the rule asks for geography and no subject is switched on — which
+    is exactly the state a reader lands in after tapping the seeded built-in
+    quiz for the first time, since subjects default to off.
+  */
+  const enabledSubjects = useEnabledSubjects();
+  const needsGeographySubjects =
+    enabledSubjects.length === 0 && !!quiz?.rule.topics?.includes(GEOGRAPHY_TOPIC);
+
+  // The calendar twin of the same state: the built-in Calendar quiz is seeded
+  // with every subject off, and only Settings can fill it.
+  const enabledCalendarSubjects = useEnabledCalendarSubjects();
+  const needsCalendarSubjects =
+    enabledCalendarSubjects.length === 0 && !!quiz?.rule.topics?.includes(CALENDAR_TOPIC);
 
   const availability = useMemo(
     () => (quiz ? describeAvailability({ bank: questions, reviewStates, rule: quiz.rule, now }) : null),
@@ -136,10 +173,37 @@ export default function QuizDetailScreen() {
             ]}
           />
 
+          {/*
+            The breakdown above is a fact about the schedule either way, but
+            "Resting" reads as "will not be asked" — which stops being true in
+            even mode, where every matching question is eligible. Saying so here
+            is cheaper than making the reader remember a setting.
+          */}
+          {selectionMode === 'even' ? (
+            <Text style={styles.draw}>
+              Even picking is on, so all {availability.matching} are equally likely — resting and
+              difficult ones included. Change it in Settings.
+            </Text>
+          ) : null}
+
           {availability.matching === 0 ? (
+            /*
+              An empty geography quiz has a different cause and a different cure
+              from an empty note quiz, so it gets its own advice. The generic
+              line tells the reader to generate questions from their sources,
+              which for geography is not merely unhelpful — it is impossible.
+              Nothing is generated, and no source is involved; there is a switch
+              in Settings and that is all.
+            */
             <Callout
               tone="warning"
-              message="Nothing matches this quiz yet. Loosen the rule, or generate more questions from your sources."
+              message={
+                needsGeographySubjects
+                  ? 'This quiz asks about geography, but no subjects are switched on. Turn on US States, Europe or Continents in Settings and it will fill up straight away.'
+                  : needsCalendarSubjects
+                    ? 'This quiz asks about the calendar, but no subjects are switched on. Turn on Months, Days of the week, Seasons or Holiday dates in Settings and it will fill up straight away.'
+                    : 'Nothing matches this quiz yet. Loosen the rule, or generate more questions from your sources.'
+              }
             />
           ) : availability.matching < quiz.rule.size ? (
             <Callout
@@ -195,9 +259,9 @@ export default function QuizDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   masteryLabel: { ...type.small, color: colors.textMuted },
   rule: { ...type.bodyStrong, color: colors.text },
   draw: { ...type.small, color: colors.textMuted },
   footer: { gap: spacing.sm, marginTop: spacing.md },
-});
+}));

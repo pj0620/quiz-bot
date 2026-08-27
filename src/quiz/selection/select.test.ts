@@ -314,3 +314,140 @@ describe('describeAvailability', () => {
     expect(describeAvailability({ bank, reviewStates: {}, rule: rule(), now: NOW }).matching).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+
+describe('even mode — every matching question equally likely', () => {
+  /** Six failures in a row is what marks a question as a leech. */
+  function leechState(id: string): ReviewState {
+    let state: ReviewState | undefined;
+    for (let i = 0; i < 6; i += 1) state = recordReview(state, id, 'incorrect', NOW);
+    return { ...(state as ReviewState), dueAt: NOW - 1000 };
+  }
+
+  const even = (input: Parameters<typeof selectQuestions>[0]) =>
+    selectQuestions({ ...input, mode: 'even' });
+
+  it('draws a question the schedule is resting, which spaced mode will not', () => {
+    /*
+      The single behaviour this mode exists for. Under `spaced`, a question
+      answered correctly yesterday is unreachable until its interval elapses —
+      which is correct for memorisation and wrong if you wanted a fair sample of
+      everything you have written down.
+    */
+    const bank = [q('1')];
+    const reviewStates = { '1': futureState('1') };
+
+    expect(selectQuestions({ bank, reviewStates, rule: rule(), now: NOW, seed: 1 }).questions).toEqual([]);
+    expect(even({ bank, reviewStates, rule: rule(), now: NOW, seed: 1 }).questions).toHaveLength(1);
+  });
+
+  it('draws a leech, because "any question" includes the awkward ones', () => {
+    // Safe here in a way it is not under spaced: a uniform draw cannot let one
+    // impossible question fill every session, which is what leeching guards against.
+    const bank = [q('1')];
+    const reviewStates = { '1': leechState('1') };
+
+    expect(selectQuestions({ bank, reviewStates, rule: rule(), now: NOW, seed: 1 }).questions).toEqual([]);
+    expect(even({ bank, reviewStates, rule: rule(), now: NOW, seed: 1 }).questions).toHaveLength(1);
+  });
+
+  it('drops the new/review quota that makes unseen questions likelier', () => {
+    /*
+      Under `balanced`, half the session is reserved for unseen questions. With
+      one unseen and nine seen, spaced returns the unseen one plus whatever is
+      due; even should just take four of the ten at random.
+    */
+    const bank = Array.from({ length: 10 }, (_, i) => q(String(i)));
+    const reviewStates: Record<string, ReviewState> = {};
+    for (let i = 1; i < 10; i += 1) reviewStates[String(i)] = futureState(String(i));
+
+    const result = even({ bank, reviewStates, rule: rule({ size: 4 }), now: NOW, seed: 7 });
+    expect(result.questions).toHaveLength(4);
+    // The unseen question has no privileged claim on a slot any more.
+    expect(result.counts.new + result.counts.due).toBe(4);
+  });
+
+  it('ignores how overdue a question is, which spaced mode orders by', () => {
+    // Under spaced the most overdue is certain to appear; here it is one of two.
+    const bank = [q('1'), q('2')];
+    const reviewStates = {
+      '1': { ...dueState('1'), dueAt: addDays(NOW, -30) },
+      '2': { ...dueState('2'), dueAt: NOW - 1000 },
+    };
+
+    const drawn = new Set<string>();
+    for (let seed = 0; seed < 20; seed += 1) {
+      for (const question of even({ bank, reviewStates, rule: rule({ size: 1 }), now: NOW, seed }).questions) {
+        drawn.add(question.id);
+      }
+    }
+    expect(drawn).toEqual(new Set(['1', '2']));
+  });
+
+  it('reaches every question across enough draws', () => {
+    // The claim the setting makes, tested as a claim: nothing is unreachable.
+    const bank = Array.from({ length: 12 }, (_, i) => q(String(i)));
+    const reviewStates: Record<string, ReviewState> = {};
+    for (const question of bank) reviewStates[question.id] = futureState(question.id);
+
+    const seen = new Set<string>();
+    for (let seed = 0; seed < 60; seed += 1) {
+      for (const question of even({ bank, reviewStates, rule: rule({ size: 3 }), now: NOW, seed }).questions) {
+        seen.add(question.id);
+      }
+    }
+    expect(seen.size).toBe(12);
+  });
+
+  it('still honours the rule, which is a filter rather than a weighting', () => {
+    const bank = [q('1', { topics: ['auth'] }), q('2', { topics: ['billing'] })];
+    const result = even({ bank, reviewStates: {}, rule: rule({ topics: ['auth'] }), now: NOW, seed: 1 });
+    expect(result.questions.map((question) => question.id)).toEqual(['1']);
+  });
+
+  it('still honours mix, so "review only" does not start serving unseen questions', () => {
+    /*
+      `mix` is part of the quiz's stated rule, not part of the weighting. Weak
+      spots says review-only and has to keep meaning it — dropping this would
+      turn every quiz into the same quiz.
+    */
+    const bank = [q('seen'), q('unseen')];
+    const reviewStates = { seen: futureState('seen') };
+
+    const reviewOnly = even({ bank, reviewStates, rule: rule({ mix: 'review-only' }), now: NOW, seed: 1 });
+    expect(reviewOnly.questions.map((question) => question.id)).toEqual(['seen']);
+
+    const newOnly = even({ bank, reviewStates, rule: rule({ mix: 'new-only' }), now: NOW, seed: 1 });
+    expect(newOnly.questions.map((question) => question.id)).toEqual(['unseen']);
+  });
+
+  it('honours size, the exclude list, and reports the shortfall', () => {
+    const bank = [q('1'), q('2'), q('3')];
+    const result = even({
+      bank, reviewStates: {}, rule: rule({ size: 5 }), now: NOW, seed: 1, exclude: ['1'],
+    });
+    expect(result.questions.map((question) => question.id).sort()).toEqual(['2', '3']);
+    expect(result.shortfall).toBe(3);
+    expect(result.counts.total).toBe(2);
+  });
+
+  it('is deterministic for a seed, so a resumed session does not reshuffle', () => {
+    const bank = Array.from({ length: 8 }, (_, i) => q(String(i)));
+    const input = { bank, reviewStates: {}, rule: rule({ size: 4 }), now: NOW, seed: 99 };
+    expect(even(input).questions.map((entry) => entry.id)).toEqual(
+      even(input).questions.map((entry) => entry.id),
+    );
+  });
+
+  it('leaves spaced mode exactly as it was when no mode is passed', () => {
+    // Every existing caller omits `mode`, so the default has to be the old path.
+    const bank = [q('1')];
+    const reviewStates = { '1': futureState('1') };
+    expect(
+      selectQuestions({ bank, reviewStates, rule: rule(), now: NOW, seed: 1 }).questions,
+    ).toEqual(
+      selectQuestions({ bank, reviewStates, rule: rule(), now: NOW, seed: 1, mode: 'spaced' }).questions,
+    );
+  });
+});

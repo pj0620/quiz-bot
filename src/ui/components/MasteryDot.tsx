@@ -1,16 +1,16 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { colors, spacing, type } from '../theme';
+import { colors, spacing, themedSheet, themedTokens, type } from '../theme';
 import { MASTERY_LABELS } from '../../quiz/srs/mastery';
 import type { MasteryLevel } from '../../quiz/types';
 
-export const MASTERY_COLORS: Record<MasteryLevel, string> = {
+export const MASTERY_COLORS = themedTokens<Record<MasteryLevel, string>>(() => ({
   new: colors.textFaint,
   learning: colors.primary,
   shaky: colors.danger,
   familiar: colors.warning,
   solid: colors.success,
-};
+}));
 
 type Props = {
   level: MasteryLevel;
@@ -35,7 +35,7 @@ export function MasteryDot({ level, size = 10, showLabel = false }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   label: { ...type.small, color: colors.textMuted },
-});
+}));

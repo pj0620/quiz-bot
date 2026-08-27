@@ -1,10 +1,16 @@
-import { useCallback, useMemo } from 'react';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import {
+  useCallback,
+  useMemo } from 'react';
+import { Stack,
+  useLocalSearchParams,
+  useRouter } from 'expo-router';
+import { Text, View } from 'react-native';
 
 import { formatInterval } from '../../../src/lib/day';
 import { summarizeQuestion } from '../../../src/quiz/questionTypes';
-import { useQuestions, useReviewStates, useSession } from '../../../src/quiz/useQuiz';
+import { useReviewStates, useSession, useSessionQuestions } from '../../../src/quiz/useQuiz';
+import { isCalendarQuestion } from '../../../src/quiz/calendar/catalog';
+import { geographyLocationOf } from '../../../src/quiz/geography/catalog';
 import { sessionScore } from '../../../src/quiz/types';
 import { Button } from '../../../src/ui/components/Button';
 import { Card } from '../../../src/ui/components/Card';
@@ -14,25 +20,22 @@ import { ProgressBar } from '../../../src/ui/components/ProgressBar';
 import { Screen } from '../../../src/ui/components/Screen';
 import { SectionHeader } from '../../../src/ui/components/SectionHeader';
 import { StatRow } from '../../../src/ui/components/StatRow';
-import { colors, spacing, type } from '../../../src/ui/theme';
+import { colors, spacing, themedSheet, themedTokens, type } from '../../../src/ui/theme';
 
-const OUTCOME_COLORS = {
+const OUTCOME_COLORS = themedTokens(() => ({
   correct: colors.success,
   partial: colors.warning,
   incorrect: colors.danger,
-} as const;
+} as const));
 
 export default function ResultsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
   const session = useSession(typeof params.id === 'string' ? params.id : undefined);
-  const questions = useQuestions();
   const reviewStates = useReviewStates();
 
-  const questionById = useMemo(
-    () => new Map(questions.map((question) => [question.id, question])),
-    [questions],
-  );
+  // Bank plus the session's derived geography — see `useSessionQuestions`.
+  const questionById = useSessionQuestions(session);
 
   const stats = useMemo(() => {
     if (!session) return null;
@@ -115,12 +118,27 @@ export default function ResultsScreen() {
           const state = reviewStates[item.questionId];
           const next = state ? `next in ${formatInterval(state.intervalDays)}` : 'not scheduled';
 
+          /*
+            Derived rows — geography and calendar both — do not open the
+            question screen, because there is no question there to open: that
+            screen reads the BANK, and derived questions are never in it — so
+            the row would lead to "Question not found". Its other offers would
+            not survive the trip either, since editing, deleting and reporting
+            all mutate bank rows that do not exist. A row that goes nowhere is
+            better than three that fail.
+          */
+          const openable = !geographyLocationOf(question) && !isCalendarQuestion(question);
+
           return (
             <ListRow
               key={item.questionId}
               title={question.prompt}
               subtitle={`${summarizeQuestion(question)} · ${item.flagged ? 'reported' : next}`}
-              onPress={() => router.push(`/questions/${encodeURIComponent(item.questionId)}`)}
+              onPress={
+                openable
+                  ? () => router.push(`/questions/${encodeURIComponent(item.questionId)}`)
+                  : undefined
+              }
               accessory={
                 <View
                   style={[
@@ -129,7 +147,7 @@ export default function ResultsScreen() {
                   ]}
                 />
               }
-              showChevron
+              showChevron={openable}
             />
           );
         })}
@@ -152,9 +170,9 @@ export default function ResultsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   score: { ...type.title, color: colors.text, textAlign: 'center' },
   verdict: { ...type.body, color: colors.textMuted, textAlign: 'center' },
   caveat: { ...type.small, color: colors.textFaint, textAlign: 'center' },
   dot: { width: 10, height: 10, borderRadius: 5 },
-});
+}));

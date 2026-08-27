@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { colors, radius, spacing, type } from '../theme';
+import { colors, radius, spacing, themedSheet, type } from '../theme';
 
 export type SegmentOption<T extends string> = {
   value: T;
@@ -41,7 +41,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange }:
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   track: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
@@ -63,4 +63,4 @@ const styles = StyleSheet.create({
   pressed: { backgroundColor: colors.surfaceAlt },
   label: { ...type.small, color: colors.textMuted, fontWeight: '600' },
   selectedLabel: { color: colors.primaryText },
-});
+}));

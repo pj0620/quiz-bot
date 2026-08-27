@@ -1,4 +1,5 @@
 jest.mock('../../lib/kv', () => ({
+  isStorageDegraded: jest.fn(() => false),
   readJsonSync: jest.fn(() => null),
   writeJson: jest.fn(async () => undefined),
   getItemSync: jest.fn(() => null),
@@ -15,6 +16,7 @@ jest.mock('../../sources/registry', () => ({
   getSourceType: jest.fn(() => ({ provider: {} })),
 }));
 
+import { setConcurrency } from '../../features/llm/settings';
 import { AppError } from '../../lib/errors';
 import type { GitHubRepoSource } from '../../sources/types';
 import type { MultipleChoiceQuestion } from '../types';
@@ -153,5 +155,72 @@ describe('incremental saving', () => {
     expect(entry?.failures).toBe(1);
     expect(entry?.contentHash).toBeUndefined();
     expect(entry?.generatedAt).toBe(0);
+  });
+});
+
+describe('what the poller passes down and hands back', () => {
+  it('takes the concurrency from Settings when the caller does not name one', async () => {
+    let seen: number | undefined;
+    setGenerator({
+      name: 'observed',
+      async generate(input: GenerationInput) {
+        seen = input.concurrency;
+        return { questions: [], notesScanned: 0, notesAvailable: 0 };
+      },
+    });
+
+    setConcurrency(3);
+    await pollSource(source);
+    expect(seen).toBe(3);
+  });
+
+  it('lets a caller override it', async () => {
+    let seen: number | undefined;
+    setGenerator({
+      name: 'observed',
+      async generate(input: GenerationInput) {
+        seen = input.concurrency;
+        return { questions: [], notesScanned: 0, notesAvailable: 0 };
+      },
+    });
+
+    setConcurrency(3);
+    await pollSource(source, { concurrency: 1 });
+    expect(seen).toBe(1);
+  });
+
+  it('names the source on every progress event', async () => {
+    /*
+      A note event carries only a path, because a generator works inside one
+      source and has no reason to repeat it. Anything watching a run across
+      several sources needs the pair — two vaults can hold the same path.
+    */
+    setGenerator(scripted([{ path: 'a.md', questions: ['q1'], contentHash: 'h1' }], true));
+
+    const seen: string[] = [];
+    await pollSource(source, { onProgress: ({ sourceId }) => seen.push(sourceId) });
+
+    expect(seen).toEqual([source.id]);
+  });
+
+  it('forwards the plan and the per-note start', async () => {
+    setGenerator({
+      name: 'planner',
+      async generate(input: GenerationInput) {
+        input.onPlan?.([{ sourceId: source.id, path: 'a.md', noteTitle: 'a.md' }]);
+        input.onNoteStart?.({ sourceId: source.id, path: 'a.md', noteTitle: 'a.md' });
+        return { questions: [], notesScanned: 1, notesAvailable: 1 };
+      },
+    });
+
+    const planned: string[] = [];
+    const started: string[] = [];
+    await pollSource(source, {
+      onPlan: (notes) => planned.push(...notes.map((note) => note.path)),
+      onNoteStart: (note) => started.push(note.path),
+    });
+
+    expect(planned).toEqual(['a.md']);
+    expect(started).toEqual(['a.md']);
   });
 });

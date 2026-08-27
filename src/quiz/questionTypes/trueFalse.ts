@@ -1,5 +1,5 @@
 import type { Grade, TrueFalseAnswer, TrueFalseQuestion } from '../types';
-import { hasValidQuestionBase, type QuestionTypeLogic } from './contract';
+import { hasValidQuestionBase, type AnswerTranscript, type QuestionTypeLogic } from './contract';
 
 export const trueFalseLogic: QuestionTypeLogic<TrueFalseQuestion> = {
   format: 'true-false',
@@ -25,7 +25,19 @@ export const trueFalseLogic: QuestionTypeLogic<TrueFalseQuestion> = {
   summarize(): string {
     return 'True or false';
   },
+
+  transcribe(question, answer): AnswerTranscript {
+    return {
+      // Explicit null check again: `false` is an answer, not a missing one.
+      given: answer ? label(answer.value) : undefined,
+      expected: label(question.correct),
+    };
+  },
 };
+
+function label(value: boolean): string {
+  return value ? 'True' : 'False';
+}
 
 export function trueFalseAnswer(value: boolean): TrueFalseAnswer {
   return { format: 'true-false', value };

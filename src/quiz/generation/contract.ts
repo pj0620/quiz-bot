@@ -16,6 +16,21 @@ import type { Question } from '../types';
  */
 
 /**
+ * A note a run intends to read, named before any of it is read.
+ *
+ * The whole list is handed over up front so progress can be shown as the work
+ * itself — every note by name, each with its own state — rather than as a
+ * count of things that have already happened. "3 of 10 notes" tells you nothing
+ * about what is being worked on or what is left.
+ */
+export type PlannedNote = {
+  sourceId: string;
+  path: string;
+  /** The vault filename, verbatim and unshortened. */
+  noteTitle: string;
+};
+
+/**
  * Emitted after each note, before the run has finished.
  *
  * Exists because generation now costs money per note. Returning everything at
@@ -31,6 +46,13 @@ export type NoteGenerationEvent = {
   contentHash?: string;
   questions: Question[];
   usage?: { inputTokens: number; outputTokens: number };
+  /**
+   * Requests this note actually cost. Usually 1.
+   *
+   * A long note is split across several, so "notes read" stopped being a proxy
+   * for "requests paid for" — this is what keeps the cost of that visible.
+   */
+  modelCalls?: number;
   /** Set when this note failed. The run continues regardless. */
   error?: AppError;
 };
@@ -39,23 +61,44 @@ export type GenerationInput = {
   source: InfoSource;
   provider: SourceContentProvider;
   /**
-   * Stop once this many questions have been produced.
+   * Stop once this many questions have been produced. Absent means no limit.
    *
-   * The primary budget: someone wants "enough questions", not "N notes read".
+   * Demoted from the primary budget to an optional guard. It only made sense
+   * while every note yielded a fixed five — now that a note yields as many
+   * questions as its material is worth, a question total says nothing useful
+   * about how much work or money a run represents. `maxNotes` does.
    */
-  targetQuestions: number;
+  targetQuestions?: number;
   /**
-   * Hard ceiling on notes read, whatever the target.
+   * How many notes to read. The budget, and the cost guard.
    *
-   * The cost guard. Each note is one provider request plus one model call, so
-   * without this a high target over short notes could run for a long time and
-   * spend real money.
+   * Notes are the unit that costs money: each is at least one model request,
+   * and a long one is several. Everything else about a run follows from this.
    */
   maxNotes: number;
   /** Restrict to these top-level folders. Empty/absent = the whole vault. */
   folders?: string[];
+  /**
+   * Notes to work on at once. Defaults to 1.
+   *
+   * The default is deliberately sequential. Every caller that wants parallelism
+   * asks for it, which keeps a generator's behaviour under test identical to
+   * what it was — ordering, event counts and how far a fatal error gets are all
+   * things concurrency changes.
+   */
+  concurrency?: number;
   /** Ids already in the bank, so a generator can skip re-deriving them. */
   existingIds?: ReadonlySet<string>;
+  /**
+   * The notes this run selected, emitted once before any of them is read.
+   *
+   * Selection happens inside the generator — it consults the coverage ledger,
+   * applies the folder filter and the cap — so this is the only way a caller can
+   * name the work in advance rather than discovering it one note at a time.
+   */
+  onPlan?: (notes: PlannedNote[]) => void;
+  /** A note has been claimed and is being worked on. */
+  onNoteStart?: (note: PlannedNote) => void;
   onNote?: (event: NoteGenerationEvent) => void;
   signal?: AbortSignal;
   now?: number;

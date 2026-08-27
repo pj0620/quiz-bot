@@ -6,7 +6,7 @@ import { View } from 'react-native';
 
 import { describeRule } from '../../src/quiz/selection/describeRule';
 import { describeAvailability } from '../../src/quiz/selection/select';
-import { useQuestions, useQuizzes, useReviewStates } from '../../src/quiz/useQuiz';
+import { useQuizzes, useReviewStates, useSelectableQuestions } from '../../src/quiz/useQuiz';
 import type { Quiz } from '../../src/quiz/types';
 import { getSources } from '../../src/sources/store';
 import { Badge } from '../../src/ui/components/Badge';
@@ -20,7 +20,8 @@ import { spacing } from '../../src/ui/theme';
 export default function QuizzesScreen() {
   const router = useRouter();
   const quizzes = useQuizzes();
-  const questions = useQuestions();
+  // Bank plus enabled geography — see `useSelectableQuestions`.
+  const questions = useSelectableQuestions();
   const reviewStates = useReviewStates();
   const now = Date.now();
 

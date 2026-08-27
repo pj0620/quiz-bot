@@ -1,17 +1,18 @@
 import type { ReactNode } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import {
+  Ionicons } from '@expo/vector-icons';
+import { Text, View } from 'react-native';
 
-import { colors, radius, spacing, type } from '../theme';
+import { colors, radius, spacing, themedSheet, themedTokens, type } from '../theme';
 
 export type CalloutTone = 'info' | 'success' | 'warning' | 'danger';
 
-const TONES = {
+const TONES = themedTokens(() => ({
   info: { surface: colors.surfaceAlt, border: colors.border, fg: colors.text, icon: 'information-circle' },
   success: { surface: colors.successSurface, border: colors.success, fg: colors.success, icon: 'checkmark-circle' },
   warning: { surface: colors.warningSurface, border: colors.warning, fg: colors.warning, icon: 'alert-circle' },
   danger: { surface: colors.dangerSurface, border: colors.danger, fg: colors.danger, icon: 'close-circle' },
-} as const;
+} as const));
 
 type Props = {
   tone?: CalloutTone;
@@ -37,7 +38,7 @@ export function Callout({ tone = 'info', title, message, children }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   container: {
     borderWidth: 1,
     borderRadius: radius.md,
@@ -49,4 +50,4 @@ const styles = StyleSheet.create({
   title: { ...type.smallStrong },
   message: { ...type.small, color: colors.text, lineHeight: 19 },
   actions: { gap: spacing.sm },
-});
+}));

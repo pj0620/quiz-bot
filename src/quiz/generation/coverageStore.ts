@@ -100,6 +100,43 @@ export function clearCoverageForSource(sourceId: string): void {
   });
 }
 
+/** Notes that were read and yielded nothing. */
+export function countEmptyCoverage(): number {
+  return Object.values(coverageStore.get().entries).filter(
+    (entry) => entry.generatedAt > 0 && entry.questionCount === 0,
+  ).length;
+}
+
+/**
+ * Forgets the notes that produced no questions, so the next run retries them.
+ *
+ * A note read for nothing is recorded as covered, which is right while the
+ * reason is genuine — a page of screenshots should not be paid for twice. It is
+ * wrong when the reason was a bug in ours: notes skipped by an over-strict rule
+ * were marked done at their current hash and would never have been looked at
+ * again, short of editing every one of them.
+ *
+ * Narrower than clearing everything, which would re-generate the whole vault at
+ * full price to reach a handful of notes.
+ */
+export function clearEmptyCoverage(): number {
+  let removed = 0;
+  coverageStore.set((state) => {
+    const entries: Record<string, NoteCoverage> = {};
+    for (const [key, entry] of Object.entries(state.entries)) {
+      if (entry.generatedAt > 0 && entry.questionCount === 0) {
+        removed += 1;
+        continue;
+      }
+      entries[key] = entry;
+    }
+    if (removed === 0) return state;
+    persist(entries);
+    return { entries };
+  });
+  return removed;
+}
+
 /** Reset affordance: forget everything so the next run re-covers the vault. */
 export function clearAllCoverage(): void {
   coverageStore.set({ entries: {} });

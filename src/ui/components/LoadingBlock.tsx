@@ -1,6 +1,6 @@
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
-import { colors, spacing, type } from '../theme';
+import { colors, spacing, themedSheet, type } from '../theme';
 
 type Props = {
   message?: string;
@@ -18,7 +18,7 @@ export function LoadingBlock({ message, size = 'page' }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -27,4 +27,4 @@ const styles = StyleSheet.create({
   },
   inline: { flexDirection: 'row', paddingVertical: spacing.md },
   message: { ...type.small, color: colors.textMuted, textAlign: 'center' },
-});
+}));

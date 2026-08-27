@@ -1,5 +1,7 @@
 import { createStore } from '../lib/createStore';
 import { hashString } from '../lib/random';
+import { CALENDAR_TOPIC } from './calendar/types';
+import { GEOGRAPHY_TOPIC } from './geography/types';
 import { recordReview } from './srs/schedule';
 import {
   capBank,
@@ -22,6 +24,7 @@ import type {
   Question,
   Quiz,
   ReviewState,
+  SelfGrade,
   Session,
 } from './types';
 import { isGraded } from './types';
@@ -90,6 +93,110 @@ export function unflagQuestion(questionId: string): void {
   });
   bankStore.set({ questions });
   persistBank(questions);
+}
+
+/**
+ * Replaces a question in place, keeping its id.
+ *
+ * The id is the whole point of "in place". It keys review state, session items
+ * and coverage, and it is normally derived from a hash of the prompt — so
+ * letting an edit re-derive it would silently orphan the user's entire history
+ * with that question and hand them a brand new card at interval zero. An edit
+ * is a correction to something they already know, not a different question.
+ *
+ * Caller's job to preserve it; this refuses anything else rather than writing a
+ * duplicate under a new id.
+ */
+export function updateQuestion(next: Question): boolean {
+  const state = bankStore.get();
+  if (!state.questions.some((question) => question.id === next.id)) return false;
+
+  const questions = state.questions.map((question) =>
+    question.id === next.id ? next : question,
+  );
+  bankStore.set({ questions });
+  persistBank(questions);
+  return true;
+}
+
+/**
+ * Deletes questions and everything pointing at them.
+ *
+ * One function rather than three, for the reason `clearQuestionBank` gives: a
+ * partial delete leaves states that look like bugs. A leftover review state
+ * keeps counting towards "due" for a card nothing can show, and a session item
+ * referencing a deleted question drops the player into its "nothing left to
+ * answer" screen mid-quiz.
+ *
+ * `currentIndex` is clamped after the items are removed, so deleting the
+ * question you are looking at lands on the next one rather than off the end.
+ *
+ * Takes a LIST rather than being called in a loop, because the bank screen can
+ * now delete a whole filtered view at once. Looping would rewrite and re-persist
+ * every store once per question — quadratic on the bank, and hundreds of
+ * scheduled writes — where the work here is the same three passes whether one
+ * question is going or a thousand.
+ */
+export function deleteQuestions(questionIds: readonly string[]): { removed: number } {
+  const doomed = new Set(questionIds);
+  if (doomed.size === 0) return { removed: 0 };
+
+  const state = bankStore.get();
+  const questions = state.questions.filter((question) => !doomed.has(question.id));
+  const removed = state.questions.length - questions.length;
+  if (removed === 0) return { removed: 0 };
+
+  bankStore.set({ questions });
+  persistBank(questions);
+
+  const states = { ...reviewStore.get().states };
+  let reviewsChanged = false;
+  for (const id of doomed) {
+    if (states[id]) {
+      delete states[id];
+      reviewsChanged = true;
+    }
+  }
+  if (reviewsChanged) {
+    reviewStore.set({ states });
+    reviewSaver.schedule(states);
+  }
+
+  /*
+    Only UNSETTLED items, and only in a session still running.
+
+    An item the user already answered or flagged is history: it is counted on
+    the results screen and in their streak, and quietly deleting it rewrites
+    what they did. A finished session is history entire. What genuinely breaks
+    is an item still waiting to be asked whose question no longer exists — the
+    player looks it up, finds nothing, and shows "nothing left to answer" in the
+    middle of a quiz. That is the only case worth removing.
+  */
+  let sessionsChanged = false;
+  const sessions = sessionsStore.get().sessions.map((session) => {
+    if (session.status !== 'active') return session;
+    const items = session.items.filter(
+      (item) => !doomed.has(item.questionId) || !!item.outcome || !!item.flagged,
+    );
+    if (items.length === session.items.length) return session;
+    sessionsChanged = true;
+    return {
+      ...session,
+      items,
+      currentIndex: Math.min(session.currentIndex, Math.max(0, items.length - 1)),
+    };
+  });
+  if (sessionsChanged) {
+    sessionsStore.set({ sessions });
+    sessionsSaver.schedule(sessions);
+  }
+
+  return { removed };
+}
+
+/** The single-question case, which is all the detail screen ever needs. */
+export function deleteQuestion(questionId: string): boolean {
+  return deleteQuestions([questionId]).removed > 0;
 }
 
 /** Called when a source is disconnected — its questions have no meaning without it. */
@@ -239,6 +346,36 @@ export const BUILTIN_QUIZZES: Quiz[] = [
     // Runs short when you're caught up rather than padding with easy material.
     rule: { size: 15, mix: 'review-only', maxMastery: 'shaky' },
   },
+  {
+    id: 'builtin:geography',
+    name: 'Geography',
+    icon: 'globe-outline',
+    builtin: true,
+    createdAt: 0,
+    /*
+      Seeded like the others, and empty until a subject is switched on in
+      Settings — geography questions are derived from the enabled subjects, so
+      this quiz draws nothing at all by default.
+
+      `mix: 'balanced'` rather than 'new-only' because the catalog is fixed and
+      finite: once you have seen all fifty states there is nothing new left, and
+      a new-only rule would go permanently empty at exactly the point the
+      reader most needs review.
+    */
+    rule: { size: 10, mix: 'balanced', topics: [GEOGRAPHY_TOPIC] },
+  },
+  {
+    id: 'builtin:calendar',
+    name: 'Calendar',
+    icon: 'calendar-outline',
+    builtin: true,
+    createdAt: 0,
+    // Same shape as the geography quiz, for the same reasons: empty until a
+    // subject is switched on in Settings, and `balanced` because the catalog
+    // is finite — a new-only rule would go permanently empty at exactly the
+    // point the reader most needs review.
+    rule: { size: 10, mix: 'balanced', topics: [CALENDAR_TOPIC] },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -326,6 +463,46 @@ export function answerSessionItem(
   return grade;
 }
 
+/**
+ * "I don't know" — reveals the answer and records it as missed.
+ *
+ * A separate function rather than submitting a blank answer through
+ * `answerSessionItem`, and the reason is true/false. There is no empty value
+ * for a boolean, so a blank submission would be graded against the correct
+ * answer and come out RIGHT half the time. Giving up would then be rewarded
+ * with a tick and a strengthened review interval, which is the exact opposite
+ * of what the button means.
+ *
+ * So the outcome is stated, not derived. No `answer` is stored either: the user
+ * did not give one, and inventing a plausible-looking blank answer to satisfy
+ * the type would show up as their attempt on the results screen.
+ *
+ * Everything else matches `answerSessionItem` — same flagged-item exemption, so
+ * a question the user has declared broken still doesn't damage their schedule.
+ */
+export function giveUpSessionItem(
+  sessionId: string,
+  questionId: string,
+  now = Date.now(),
+): Grade | null {
+  const session = getSessionById(sessionId);
+  if (!session) return null;
+
+  const grade: Grade = { status: 'graded', outcome: 'incorrect', score: 0 };
+
+  const items = session.items.map((item) =>
+    item.questionId === questionId
+      ? { ...item, grade, outcome: grade.outcome, answeredAt: now }
+      : item,
+  );
+  replaceSession({ ...session, items });
+
+  if (!session.items.find((item) => item.questionId === questionId)?.flagged) {
+    applyReview(questionId, grade.outcome, now);
+  }
+  return grade;
+}
+
 export function flagSessionItem(sessionId: string, questionId: string): void {
   const session = getSessionById(sessionId);
   if (!session) return;
@@ -339,6 +516,78 @@ export function advanceSession(sessionId: string): void {
   const session = getSessionById(sessionId);
   if (!session) return;
   replaceSession({ ...session, currentIndex: Math.min(session.currentIndex + 1, session.items.length) });
+}
+
+/**
+ * Moves the player to an arbitrary item — the back arrow, and the walk forward
+ * again after it. Clamped rather than validated: the player computes the
+ * target from the same session it renders, so anything out of range here is a
+ * race with a delete, and landing on the nearest real item beats crashing.
+ */
+export function setSessionIndex(sessionId: string, index: number): void {
+  const session = getSessionById(sessionId);
+  if (!session) return;
+  const clamped = Math.max(0, Math.min(index, Math.max(0, session.items.length - 1)));
+  if (clamped === session.currentIndex) return;
+  replaceSession({ ...session, currentIndex: clamped });
+}
+
+/**
+ * Overrules the recorded verdict on an already-settled item.
+ *
+ * This is what the back arrow exists FOR: you press Next, realise a beat later
+ * the tick was wrong — you misread your own answer, or the judge was too
+ * kind — and go back to set the record straight. It rewrites the item's grade
+ * and outcome in place, keeps a short-answer's `selfGrade` in step (the
+ * results screen reads it), and never invents an `answer` the reader did not
+ * give.
+ *
+ * The review schedule is re-fed the corrected outcome, exactly as the
+ * existing "I got that right" override after model marking does: SM-2 has no
+ * undo, so the correction is applied as a further review rather than a
+ * rewrite of history. The direction is what matters — a wrong "correct" would
+ * otherwise push the question months out.
+ *
+ * Flagged items stay exempt, the same rule every other grading path follows.
+ */
+export function overrideSessionItemOutcome(
+  sessionId: string,
+  questionId: string,
+  outcome: Outcome,
+  now = Date.now(),
+): void {
+  const session = getSessionById(sessionId);
+  if (!session) return;
+  const item = session.items.find((entry) => entry.questionId === questionId);
+  // Only settled items can be re-marked — an unanswered one has no verdict to flip.
+  if (!item || (item.outcome === undefined && item.grade === undefined)) return;
+
+  const grade: Grade = {
+    status: 'graded',
+    outcome,
+    score: outcome === 'correct' ? 1 : outcome === 'partial' ? 0.5 : 0,
+  };
+
+  const answer =
+    item.answer?.format === 'short-answer'
+      ? {
+          ...item.answer,
+          selfGrade: (outcome === 'correct'
+            ? 'got-it'
+            : outcome === 'partial'
+              ? 'close'
+              : 'missed') as SelfGrade,
+        }
+      : item.answer;
+
+  const items = session.items.map((entry) =>
+    entry.questionId === questionId
+      ? { ...entry, ...(answer ? { answer } : {}), grade, outcome, answeredAt: entry.answeredAt ?? now }
+      : entry,
+  );
+  replaceSession({ ...session, items });
+
+  if (!item.flagged) applyReview(questionId, outcome, now);
 }
 
 export function completeSession(sessionId: string, now = Date.now()): void {

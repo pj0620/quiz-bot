@@ -1,3 +1,5 @@
+import type { MapId } from './geography/types';
+
 /**
  * The quiz domain model.
  *
@@ -37,6 +39,34 @@ export type Provenance = {
   section?: string;
   /** Verbatim excerpt shown under "where this came from". Capped at write time. */
   excerpt?: string;
+  /**
+   * The passage the model says this question came from, copied from the note.
+   *
+   * Used to highlight the relevant lines inside the note rather than showing an
+   * arbitrary opening slice of it. Matched leniently at render time — a model's
+   * "verbatim" re-wraps and re-punctuates — so a quote that no longer matches
+   * degrades to no highlight rather than to a wrong one.
+   */
+  quote?: string;
+};
+
+/**
+ * An illustration shown above the prompt.
+ *
+ * On the BASE rather than on a format, which is the whole reason "which state
+ * is this outline?" needed no new question type. A shape question is an
+ * ordinary multiple-choice or short-answer question that happens to carry a
+ * picture, so grading, review scheduling, the bank browser and the editors all
+ * handle it without knowing geography exists. Only the player, which draws it,
+ * knows.
+ *
+ * A discriminated union from the start: it will not stay one member forever,
+ * and a bare `{ regionId }` would have to be widened later at every use.
+ */
+export type QuestionFigure = {
+  kind: 'region-shape';
+  mapId: MapId;
+  regionId: string;
 };
 
 export type FlagReason = 'wrong' | 'unclear' | 'duplicate' | 'not-useful' | 'other';
@@ -73,6 +103,11 @@ export type QuestionBase = {
   contentAt?: number;
   /** Set by "report a bad question". Excluded from selection while present. */
   flagged?: FlagRecord;
+  /**
+   * A picture the prompt refers to. Absent on everything derived from a note —
+   * only geography sets it. See `QuestionFigure`.
+   */
+  figure?: QuestionFigure;
 };
 
 export type Choice = { id: string; text: string };
@@ -131,12 +166,72 @@ export type FillBlankQuestion = QuestionBase & {
   blanks: Blank[];
 };
 
+export type TimelineEvent = {
+  id: string;
+  /** What happened. Must NOT contain the date — see `TimelineQuestion`. */
+  label: string;
+  /**
+   * Free text: "1861", "March 1861", "c. 480 BC". Never parsed, never compared,
+   * never graded — the correct order is simply the order `events` is stored in.
+   * Shown to the reader only after they have answered.
+   */
+  date: string;
+};
+
+/**
+ * "Put these in the order they happened."
+ *
+ * The first format that tests SEQUENCE rather than a fact in isolation. Someone
+ * can know that Fort Sumter, Antietam and Appomattox all happened and have no
+ * idea which came first, and nothing else in the bank would ever catch that.
+ *
+ * Events are stored IN THEIR CORRECT ORDER and shuffled at render — the same
+ * trick multiple-choice plays with `choices`, and for the same reason: the
+ * generator never has to emit an order AND a separate answer key that it could
+ * then contradict.
+ *
+ * The date lives in its own field because a label reading "Fort Sumter is
+ * shelled, 1861" is not a timeline question, it is a reading test. Hiding the
+ * dates until reveal is the entire format.
+ */
+export type TimelineQuestion = QuestionBase & {
+  format: 'timeline';
+  /** 3..6 events, EARLIEST FIRST. */
+  events: TimelineEvent[];
+};
+
+/**
+ * "Tap Tennessee."
+ *
+ * The one format geography genuinely needed, because nothing existing can
+ * express it: every other format answers with text the reader picked or typed,
+ * and this one answers with a PLACE. Shape recognition needed no new format —
+ * see `QuestionFigure` — but pointing at a map does.
+ *
+ * Deliberately stores region IDS and nothing else. No paths, no coordinates, no
+ * labels: the map data is a static, committed table (`src/quiz/geography/data`)
+ * and duplicating any of it onto the question would mean a stored question could
+ * disagree with the map it is drawn on. `regionIds` says what to DRAW —
+ * always the whole map today, but the field is what would let a question ask
+ * about New England alone without inventing a second map.
+ */
+export type MapLocateQuestion = QuestionBase & {
+  format: 'map-locate';
+  mapId: MapId;
+  /** The region the reader has to find. Must appear in `regionIds`. */
+  targetRegionId: string;
+  /** Every region drawn, including the target. */
+  regionIds: string[];
+};
+
 export type Question =
   | MultipleChoiceQuestion
   | TrueFalseQuestion
   | ShortAnswerQuestion
   | ListRecallQuestion
-  | FillBlankQuestion;
+  | FillBlankQuestion
+  | TimelineQuestion
+  | MapLocateQuestion;
 
 /**
  * DERIVED, never hand-maintained. Adding a member to `Question` above
@@ -170,13 +265,19 @@ export type ShortAnswerAnswer = {
 };
 export type ListRecallAnswer = { format: 'list-recall'; entries: string[] };
 export type FillBlankAnswer = { format: 'fill-blank'; values: Record<string, string> };
+/** Event ids in the order the reader currently has them arranged. */
+export type TimelineAnswer = { format: 'timeline'; order: string[] };
+/** The region tapped. Never a coordinate — see `MapLocateQuestion`. */
+export type MapLocateAnswer = { format: 'map-locate'; regionId: string };
 
 export type Answer =
   | MultipleChoiceAnswer
   | TrueFalseAnswer
   | ShortAnswerAnswer
   | ListRecallAnswer
-  | FillBlankAnswer;
+  | FillBlankAnswer
+  | TimelineAnswer
+  | MapLocateAnswer;
 
 /** The answer type belonging to a given question type. */
 export type AnswerFor<Q extends Question> = Extract<Answer, { format: Q['format'] }>;
@@ -193,7 +294,7 @@ export type Grade =
   | {
       status: 'graded';
       outcome: Outcome;
-      /** 0..1. Used by fill-blank for partial credit; 1 or 0 elsewhere. */
+      /** 0..1. Used by fill-blank and timeline for partial credit; 1 or 0 elsewhere. */
       score: number;
       /** Per-part correctness, for formats with multiple inputs. */
       parts?: Record<string, boolean>;

@@ -1,12 +1,20 @@
 import { HttpError, requestJson } from '../../../lib/http';
-import type { LlmProviderDefinition } from '../contract';
+import { COMPLETION_TIMEOUT_MS, type LlmProviderDefinition } from '../contract';
 import { classifyLlmError } from '../errors';
 import type { CompletionInput, CompletionResult, HttpRequestSpec, StopReason } from '../types';
 
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 
-/** Generation is slower than a normal API call, so the 15s default is too tight. */
-const TIMEOUT_MS = 90_000;
+/**
+ * Whether a model accepts `reasoning_effort`.
+ *
+ * Same shape as the Anthropic gate and for the same reason: the model field is
+ * free text, non-reasoning models (gpt-4o and friends) reject the parameter as
+ * a 400, and failing closed just means an unknown model keeps its own default.
+ */
+export function supportsEffort(model: string): boolean {
+  return /^(gpt-5|o\d)/.test(model);
+}
 
 export function buildRequest(input: CompletionInput): HttpRequestSpec {
   return {
@@ -26,6 +34,9 @@ export function buildRequest(input: CompletionInput): HttpRequestSpec {
       */
       max_completion_tokens: input.maxTokens,
       ...(input.json ? { response_format: { type: 'json_object' } } : {}),
+      ...(input.effort && supportsEffort(input.model)
+        ? { reasoning_effort: input.effort }
+        : {}),
       messages: [
         { role: 'system', content: input.system },
         { role: 'user', content: input.user },
@@ -66,7 +77,7 @@ async function complete(input: CompletionInput): Promise<CompletionResult> {
       method: 'POST',
       headers: spec.headers,
       body: spec.body,
-      timeoutMs: TIMEOUT_MS,
+      timeoutMs: COMPLETION_TIMEOUT_MS,
       signal: input.signal,
     });
     return parseResponse(data);
@@ -89,6 +100,7 @@ export const openaiProvider: LlmProviderDefinition = {
     { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', note: 'Fastest, cheapest' },
   ],
   defaultModel: 'gpt-5.6-terra',
+  defaultJudgeModel: 'gpt-5.6-luna',
   buildRequest,
   parseResponse,
   complete,

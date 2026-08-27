@@ -1,5 +1,5 @@
 import type { Grade, MultipleChoiceAnswer, MultipleChoiceQuestion } from '../types';
-import { hasValidQuestionBase, type QuestionTypeLogic } from './contract';
+import { bulleted, hasValidQuestionBase, type AnswerTranscript, type QuestionTypeLogic } from './contract';
 
 export const multipleChoiceLogic: QuestionTypeLogic<MultipleChoiceQuestion> = {
   format: 'multiple-choice',
@@ -40,6 +40,17 @@ export const multipleChoiceLogic: QuestionTypeLogic<MultipleChoiceQuestion> = {
 
   summarize(question): string {
     return `${question.choices.length} choices`;
+  },
+
+  transcribe(question, answer): AnswerTranscript {
+    const text = (id: string | undefined) => question.choices.find((choice) => choice.id === id)?.text;
+    return {
+      detail: `Options:\n${bulleted(question.choices.map((choice) => choice.text))}`,
+      // Stored order, not the shuffled one the reader saw: which option sat
+      // where is an artefact of the screen and means nothing in a chat.
+      given: text(answer?.choiceId),
+      expected: text(question.correctChoiceId) ?? '(unknown)',
+    };
   },
 };
 

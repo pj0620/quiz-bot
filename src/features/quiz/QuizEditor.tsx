@@ -1,13 +1,20 @@
-import { useCallback, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useState } from 'react';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { hashString } from '../../lib/random';
 import { describeDraw } from '../../quiz/selection/describeRule';
 import { describeAvailability } from '../../quiz/selection/select';
 import { upsertQuiz } from '../../quiz/store';
 import { formatTopic } from '../../quiz/topics';
-import { useQuestions, useReviewStates, useTopicVocabulary } from '../../quiz/useQuiz';
+import {
+  useReviewStates,
+  useSelectableQuestions,
+  useSelectableTopicVocabulary,
+} from '../../quiz/useQuiz';
 import type { Quiz, QuizMix, QuizRule } from '../../quiz/types';
 import { Button } from '../../ui/components/Button';
 import { Callout } from '../../ui/components/Callout';
@@ -17,7 +24,7 @@ import { Screen } from '../../ui/components/Screen';
 import { SectionHeader } from '../../ui/components/SectionHeader';
 import { SegmentedControl } from '../../ui/components/SegmentedControl';
 import { TextField } from '../../ui/components/TextField';
-import { colors, spacing, type } from '../../ui/theme';
+import { colors, spacing, themedSheet, type } from '../../ui/theme';
 
 const SIZES = [5, 10, 15, 20];
 const WINDOWS = [0, 3, 7, 30];
@@ -35,9 +42,10 @@ type Props = {
 
 export function QuizEditor({ existing }: Props) {
   const router = useRouter();
-  const questions = useQuestions();
+  // Bank plus enabled geography — see `useSelectableQuestions`.
+  const questions = useSelectableQuestions();
   const reviewStates = useReviewStates();
-  const vocabulary = useTopicVocabulary();
+  const vocabulary = useSelectableTopicVocabulary();
   const now = Date.now();
 
   const [name, setName] = useState(existing?.name ?? '');
@@ -171,9 +179,9 @@ export function QuizEditor({ existing }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   hint: { ...type.small, color: colors.textFaint },
   preview: { ...type.bodyStrong, color: colors.text },
   previewMeta: { ...type.small, color: colors.textMuted },
   footer: { gap: spacing.sm, marginTop: spacing.md },
-});
+}));

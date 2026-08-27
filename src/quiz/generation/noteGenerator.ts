@@ -1,4 +1,6 @@
 import { addDays } from '../../lib/day';
+import { toAppError } from '../../lib/errors';
+import { forEachInPool } from '../../lib/pool';
 import { hashString, seededInt, seededPick, seededShuffle } from '../../lib/random';
 import {
   claimsOf,
@@ -18,10 +20,13 @@ import type {
   MultipleChoiceQuestion,
   Question,
   QuestionBase,
+  QuestionFormat,
   ShortAnswerQuestion,
+  TimelineQuestion,
   TrueFalseQuestion,
 } from '../types';
-import type { GenerationInput, GenerationResult, QuestionGenerator } from './contract';
+import { MAX_EVENTS, MIN_EVENTS } from '../questionTypes/timeline';
+import type { GenerationInput, GenerationResult, PlannedNote, QuestionGenerator } from './contract';
 
 /**
  * Stand-in for LLM generation, over markdown study notes.
@@ -173,6 +178,52 @@ export function chooseCloze(sentence: string): Cloze | null {
 // Builders — one per format
 // ---------------------------------------------------------------------------
 
+/**
+ * "1861 — Fort Sumter is shelled", and the handful of shapes people write it in.
+ *
+ * Anchored at the head of the bullet on purpose, and deliberately NOT
+ * `NUMBER_TOKEN`, which is unanchored and would read "5:2" or "12%" as a year.
+ * A leading year followed by a separator is the one chronology a regex can take
+ * out of a note without inventing it.
+ */
+const DATED_ITEM = /^\(?(c\.\s*)?(\d{3,4})\s*(BCE?|AD)?\)?\s*[—–\-:.)]\s+(.+)$/i;
+
+const buildTimeline: Builder = (context): TimelineQuestion | null => {
+  const dated = listItemsOf(context.section).flatMap((item) => {
+    const match = DATED_ITEM.exec(item);
+    if (!match) return [];
+    const year = Number(match[2]) * (/^BC/i.test(match[3] ?? '') ? -1 : 1);
+    const dateText = `${match[1] ?? ''}${match[2]}${match[3] ? ` ${match[3]}` : ''}`.trim();
+    return [{ year, dateText, label: match[4].trim() }];
+  });
+
+  if (dated.length < MIN_EVENTS) return null;
+
+  /*
+    Two bullets sharing a year cannot be ordered FROM THE NOTE, and choosing
+    which goes first would be exactly the invention this generator exists not to
+    do. Refusing the whole section is right: a timeline missing its ambiguous
+    pair is a different question from the one the note supports.
+  */
+  const years = dated.map((entry) => entry.year);
+  if (new Set(years).size !== years.length) return null;
+
+  const ordered = [...dated].sort((a, b) => a.year - b.year).slice(0, MAX_EVENTS);
+
+  return {
+    ...context.base,
+    id: deterministicId(context, 'timeline', ordered.map((entry) => entry.label).join('|')),
+    format: 'timeline',
+    prompt: `Put these ${ordered.length} events from your notes on “${context.label}” in the order they happened.`,
+    explanation: ordered.map((entry) => `${entry.dateText} — ${entry.label}`).join('\n'),
+    events: ordered.map((entry, index) => ({
+      id: `e${index}`,
+      label: entry.label,
+      date: entry.dateText,
+    })),
+  };
+};
+
 const buildListRecall: Builder = (context): ListRecallQuestion | null => {
   const items = listItemsOf(context.section);
   if (items.length < 2) return null;
@@ -297,17 +348,28 @@ const buildTrueFalse: Builder = (context): TrueFalseQuestion | null => {
 };
 
 /**
- * Ordered by how well each exploits note structure. The loop takes the first
- * builders that return something, so a section with a list gets a recall
- * question and a section of flowing prose falls through to the prose formats.
+ * Every builder runs; a section keeps at most one STRUCTURAL question plus a
+ * random draw from the rest. See the selection loop for why that beats taking
+ * them in priority order.
  */
 const BUILDERS: Builder[] = [
+  buildTimeline,
   buildListRecall,
   buildCloze,
   buildDefinitionRecall,
   buildMultipleChoice,
   buildTrueFalse,
 ];
+
+/**
+ * Formats that exploit a section's structure rather than its prose, in
+ * preference order — at most ONE is taken per section.
+ *
+ * A dated list satisfies both of these, and "put these in order" is the better
+ * question for it. Asking one list to be both named and ordered in the same
+ * section is one question too many about one list.
+ */
+const STRUCTURAL_FORMATS: QuestionFormat[] = ['timeline', 'list-recall'];
 
 /** At most this many questions from one section, so one long note can't dominate. */
 const MAX_PER_SECTION = 2;
@@ -345,6 +407,13 @@ export const noteGenerator: QuestionGenerator = {
     */
     const ordered = seededShuffle(notePaths, hashString(source.id)).slice(0, maxNotes);
 
+    const planned: PlannedNote[] = ordered.map((path) => ({
+      sourceId: source.id,
+      path,
+      noteTitle: noteFilename(path),
+    }));
+    input.onPlan?.(planned);
+
     /*
       Two passes.
 
@@ -353,19 +422,48 @@ export const noteGenerator: QuestionGenerator = {
       drawn from the same vault are the difference between a plausible wrong
       answer and obvious filler.
     */
-    const loaded: LoadedNote[] = [];
-    for (const path of ordered) {
-      if (signal?.aborted) break;
-      let content: string;
-      try {
-        // Pinned to the revision we listed at, so content and hash agree.
-        content = await provider.readFile(source, path, { ref: listing.revision, signal });
-      } catch {
-        // A single unreadable note shouldn't abort a generation run.
-        continue;
-      }
-      const note = parseNote(content, noteStem(path));
-      loaded.push({ path, note, topics: topicsForNote(note, path) });
+
+    /*
+      Written by index rather than pushed.
+
+      Reads run several at a time, so arrival order is whatever the network
+      decides — but position in this array feeds `backdateDays`, which spreads
+      generated questions across a window so the Daily quiz has something to
+      show. Appending as replies land would make that spread differ run to run
+      for the same vault.
+    */
+    const slots: (LoadedNote | null)[] = new Array(ordered.length).fill(null);
+    const unreadable: { path: string; error: ReturnType<typeof toAppError> }[] = [];
+
+    await forEachInPool(
+      ordered,
+      input.concurrency ?? 1,
+      async (path, index) => {
+        input.onNoteStart?.(planned[index]);
+        try {
+          // Pinned to the revision we listed at, so content and hash agree.
+          const content = await provider.readFile(source, path, { ref: listing.revision, signal });
+          const note = parseNote(content, noteStem(path));
+          slots[index] = { path, note, topics: topicsForNote(note, path) };
+        } catch (error) {
+          // A single unreadable note shouldn't abort a generation run — but it
+          // still has to be reported, or its row waits for a result that is
+          // never coming.
+          if (!signal?.aborted) unreadable.push({ path, error: toAppError(error) });
+        }
+      },
+      { stop: () => signal?.aborted === true },
+    );
+
+    const loaded: LoadedNote[] = slots.filter((entry): entry is LoadedNote => entry !== null);
+
+    for (const failure of unreadable) {
+      onNote?.({
+        path: failure.path,
+        noteTitle: noteFilename(failure.path),
+        questions: [],
+        error: failure.error,
+      });
     }
 
     const sentencePool = new Map<string, string[]>();
@@ -380,8 +478,12 @@ export const noteGenerator: QuestionGenerator = {
     const questions: Question[] = [];
     const seen = new Set(existingIds ?? []);
 
+    // Absent means no question limit — the run is bounded by how many notes it
+    // was asked to read, which is the thing that actually costs anything.
+    const reachedTarget = () => targetQuestions !== undefined && questions.length >= targetQuestions;
+
     for (const [index, entry] of loaded.entries()) {
-      if (questions.length >= targetQuestions) break;
+      if (reachedTarget()) break;
       // Collected per note so `onNote` can report them, which is what drives
       // the progress list and incremental saving.
       const noteQuestions: Question[] = [];
@@ -396,7 +498,7 @@ export const noteGenerator: QuestionGenerator = {
       const addedAt = addDays(now, -backdateDays(index, loaded.length));
 
       for (const section of entry.note.sections) {
-        if (questions.length >= targetQuestions) break;
+        if (reachedTarget()) break;
         // The screenshot case: a real heading, real structure, nothing readable.
         if (!isQuizzable(section)) continue;
 
@@ -450,7 +552,10 @@ export const noteGenerator: QuestionGenerator = {
         const candidates = BUILDERS.map((build) => build(context)).filter(
           (question): question is Question => question !== null,
         );
-        const structural = candidates.find((question) => question.format === 'list-recall');
+        const structural = STRUCTURAL_FORMATS.reduce<Question | undefined>(
+          (found, format) => found ?? candidates.find((question) => question.format === format),
+          undefined,
+        );
         const rest = candidates.filter((question) => question !== structural);
 
         const chosen: Question[] = structural ? [structural] : [];
@@ -460,7 +565,7 @@ export const noteGenerator: QuestionGenerator = {
         }
 
         for (const question of chosen) {
-          if (questions.length >= targetQuestions) break;
+          if (reachedTarget()) break;
           // Selection happens before this check, so a note that hasn't changed
           // yields the same picks and re-polling is a genuine no-op rather than
           // a source of fresh near-duplicates.

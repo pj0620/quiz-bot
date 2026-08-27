@@ -1,6 +1,6 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, Text, type ViewStyle } from 'react-native';
 
-import { colors, radius, spacing, TOUCH_TARGET, type } from '../theme';
+import { colors, radius, spacing, themedSheet, TOUCH_TARGET, type } from '../theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'plain';
 
@@ -46,7 +46,7 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   base: {
     minHeight: TOUCH_TARGET,
     borderRadius: radius.md,
@@ -62,11 +62,11 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.75 },
   disabled: { opacity: 0.45 },
   label: { ...type.bodyStrong },
-});
+}));
 
-const labelStyles = StyleSheet.create({
+const labelStyles = themedSheet(() => ({
   primary: { color: colors.primaryText },
   secondary: { color: colors.text },
   destructive: { color: colors.danger },
   plain: { color: colors.primary },
-});
+}));

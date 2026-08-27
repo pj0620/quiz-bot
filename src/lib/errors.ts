@@ -5,6 +5,7 @@
 
 export type AppErrorCode =
   | 'offline'
+  | 'connection_lost'
   | 'timeout'
   | 'config_missing'
   | 'reauth_required'
@@ -40,6 +41,7 @@ export type AppErrorOptions = {
 
 const DEFAULT_MESSAGES: Record<AppErrorCode, string> = {
   offline: "You're offline. Check your connection and try again.",
+  connection_lost: 'The connection dropped before a reply came back. Try again.',
   timeout: 'That request took too long. Try again.',
   config_missing: 'GitHub is not configured in this build.',
   reauth_required: 'Your GitHub connection expired. Reconnect to continue.',
@@ -63,6 +65,7 @@ const DEFAULT_MESSAGES: Record<AppErrorCode, string> = {
 /** Codes where the user's own retry is plausibly useful. */
 const RETRYABLE: ReadonlySet<AppErrorCode> = new Set<AppErrorCode>([
   'offline',
+  'connection_lost',
   'timeout',
   'github_secondary_rate_limit',
   'github_server_error',
@@ -129,16 +132,65 @@ export function isReauthRequired(value: unknown): value is ReauthRequiredError {
   return value instanceof ReauthRequiredError;
 }
 
+/**
+ * Transport failures that mean the request never reached a conclusion.
+ *
+ * On Expo SDK 57 `fetch` is the native URLSession implementation, so these
+ * arrive as the Foundation error text wrapped by ExpoModulesCore rather than as
+ * React Native's single "Network request failed" — matched on the message
+ * because no error code survives the bridge.
+ *
+ * The first entry is the one that matters most: iOS drops open sockets when it
+ * suspends an app, so EVERY request in flight when the user leaves rejects with
+ * `NSURLErrorNetworkConnectionLost`. It says nothing about the network and
+ * nothing about the note; it means "ask again", which is what `lib/http.ts`
+ * does once the app is awake.
+ */
+const CONNECTION_LOST = [
+  'network connection was lost', // NSURLErrorNetworkConnectionLost (-1005)
+  'software caused connection abort',
+  'connection reset by peer',
+  'cannot connect to host', // NSURLErrorCannotConnectToHost (-1004)
+  'connection failure',
+];
+
+/** Genuinely no route to the internet — worth telling the user about. */
+const OFFLINE = [
+  'network request failed', // React Native's XHR fetch, when EXPO_PUBLIC_USE_RN_FETCH is set
+  'connection appears to be offline', // NSURLErrorNotConnectedToInternet (-1009)
+  'network is unreachable',
+];
+
+function matches(message: string, patterns: readonly string[]): boolean {
+  const lower = message.toLowerCase();
+  return patterns.some((pattern) => lower.includes(pattern));
+}
+
+/**
+ * True when retrying is the right response rather than reporting a failure.
+ *
+ * Deliberately does NOT include our own `timeout`. A request that ran out of
+ * budget was answered by nobody for minutes; sending it again just spends the
+ * same money to wait the same minutes. A dropped socket is the opposite — the
+ * request was cut off, not refused.
+ */
+export function isRetryableTransportError(value: unknown): boolean {
+  const code = toAppError(value).code;
+  return code === 'connection_lost' || code === 'offline';
+}
+
 /** Coerce anything thrown into an AppError so callers never handle raw unknowns. */
 export function toAppError(value: unknown): AppError {
   if (value instanceof AppError) return value;
   if (value instanceof Error) {
-    // React Native surfaces offline as `TypeError: Network request failed`.
     if (value.name === 'AbortError') return new AppError('timeout', { cause: value });
-    if (value.message?.includes('Network request failed')) {
-      return new AppError('offline', { cause: value });
-    }
-    return new AppError('unknown', { message: value.message, cause: value });
+    const message = value.message ?? '';
+    if (matches(message, CONNECTION_LOST)) return new AppError('connection_lost', { cause: value });
+    if (matches(message, OFFLINE)) return new AppError('offline', { cause: value });
+    // NSURLErrorTimedOut, which URLSession raises on its own idle interval
+    // rather than on ours. Same meaning to the user, same message.
+    if (matches(message, ['request timed out'])) return new AppError('timeout', { cause: value });
+    return new AppError('unknown', { message, cause: value });
   }
   return new AppError('unknown', { cause: value });
 }

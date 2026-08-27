@@ -4,6 +4,7 @@ import type {
   MultipleChoiceQuestion,
   QuestionBase,
   ShortAnswerQuestion,
+  TimelineQuestion,
   TrueFalseQuestion,
 } from '../types';
 import { isGraded } from '../types';
@@ -21,6 +22,7 @@ import { trueFalseAnswer } from './trueFalse';
 import { shortAnswerAnswer } from './shortAnswer';
 import { listRecallAnswer } from './listRecall';
 import { fillBlankAnswer } from './fillBlank';
+import { timelineAnswer } from './timeline';
 
 const base: QuestionBase = {
   id: 'q1',
@@ -50,6 +52,19 @@ const mcq: MultipleChoiceQuestion = {
 };
 
 const tf: TrueFalseQuestion = { ...base, id: 'q2', format: 'true-false', correct: true };
+
+/** Stored EARLIEST FIRST — the stored order is the answer key. */
+const tl: TimelineQuestion = {
+  ...base,
+  id: 'q6',
+  format: 'timeline',
+  events: [
+    { id: 'e0', label: 'Fort Sumter is shelled', date: 'April 1861' },
+    { id: 'e1', label: 'Bull Run', date: 'July 1861' },
+    { id: 'e2', label: 'The Emancipation Proclamation', date: '1863' },
+    { id: 'e3', label: 'Lee surrenders at Appomattox', date: '1865' },
+  ],
+};
 
 const sa: ShortAnswerQuestion = {
   ...base,
@@ -354,6 +369,16 @@ describe('fill in the blank', () => {
     expect(isAnswerComplete(fb, fillBlankAnswer({ a: '5:2', b: 'south' }))).toBe(true);
   });
 
+  /*
+    The untouched blank has no KEY at all, not an empty one — the view only
+    writes a value once it has been typed into. Counting the keys present in
+    the answer therefore said "complete" when half the question was blank.
+  */
+  it('counts a blank never typed into as unfilled, not as absent', () => {
+    expect(isAnswerComplete(fb, fillBlankAnswer({ a: '5:2' }))).toBe(false);
+    expect(isAnswerComplete(fb, fillBlankAnswer({}))).toBe(false);
+  });
+
   it('rejects a template whose placeholders do not match its blanks', () => {
     expect(isValidQuestion(fb)).toBe(true);
     // Placeholder with no blank definition — renderer would draw an ungradeable input.
@@ -392,5 +417,129 @@ describe('summarize', () => {
     expect(getQuestionLogic('fill-blank').summarize(fb)).toBe('2 blanks');
     expect(getQuestionLogic('true-false').summarize(tf)).toBe('True or false');
     expect(getQuestionLogic('list-recall').summarize(lr)).toBe('Name 3 of 4');
+    expect(getQuestionLogic('timeline').summarize(tl)).toBe('Order 4 events');
+  });
+});
+
+describe('timeline', () => {
+  const correctOrder = ['e0', 'e1', 'e2', 'e3'];
+
+  it('awards full credit for the whole sequence and marks every event', () => {
+    const grade = gradeAnswer(tl, timelineAnswer(correctOrder));
+    if (!isGraded(grade)) throw new Error('expected a graded result');
+
+    expect(grade.outcome).toBe('correct');
+    expect(grade.score).toBe(1);
+    expect(grade.parts).toEqual({ e0: true, e1: true, e2: true, e3: true });
+  });
+
+  it('gives partial credit for the events that landed in the right slot', () => {
+    // The two middle events swapped: the outer two are still where they belong.
+    const grade = gradeAnswer(tl, timelineAnswer(['e0', 'e2', 'e1', 'e3']));
+    if (!isGraded(grade)) throw new Error('expected a graded result');
+
+    expect(grade.outcome).toBe('partial');
+    expect(grade.score).toBe(0.5);
+    expect(grade.parts).toEqual({ e0: true, e3: true });
+  });
+
+  /*
+    Pins the grading rule, so changing it is a deliberate act rather than a
+    side effect.
+
+    This answer has every RELATION right and is simply rotated — a reader who
+    produced it understands the sequence and misplaced one event. Position-by-
+    position scoring gives it zero, which sends the card to the lapse interval.
+    Scoring the longest correctly-ordered run instead would give it 0.75. The
+    trade was chosen knowingly; this test is where to change it.
+  */
+  it('scores an answer shifted by one at zero, because only exact slots count', () => {
+    const grade = gradeAnswer(tl, timelineAnswer(['e3', 'e0', 'e1', 'e2']));
+    if (!isGraded(grade)) throw new Error('expected a graded result');
+
+    expect(grade.score).toBe(0);
+    expect(grade.outcome).toBe('incorrect');
+    expect(grade.parts).toEqual({});
+  });
+
+  it('treats a completely backwards answer as incorrect', () => {
+    const grade = gradeAnswer(tl, timelineAnswer(['e3', 'e2', 'e1', 'e0']));
+    if (!isGraded(grade)) throw new Error('expected a graded result');
+    expect(grade.outcome).toBe('incorrect');
+  });
+
+  it('ignores an event id it no longer recognises, from an answer stored before an edit', () => {
+    // Event ids are positional, so revising a question mid-session can leave an
+    // in-flight answer pointing at events that no longer line up.
+    const grade = gradeAnswer(tl, timelineAnswer(['e0', 'gone', 'e2', 'e3']));
+    if (!isGraded(grade)) throw new Error('expected a graded result');
+    expect(grade.parts).toEqual({ e0: true, e2: true, e3: true });
+  });
+
+  it('will not count the same event twice', () => {
+    const grade = gradeAnswer(tl, timelineAnswer(['e0', 'e0', 'e0', 'e0']));
+    if (!isGraded(grade)) throw new Error('expected a graded result');
+    expect(grade.parts).toEqual({ e0: true });
+    expect(grade.score).toBe(0.25);
+  });
+
+  it('is not complete until every event has been placed', () => {
+    expect(isAnswerComplete(tl, null)).toBe(false);
+    expect(isAnswerComplete(tl, timelineAnswer(['e0', 'e1']))).toBe(false);
+    expect(isAnswerComplete(tl, timelineAnswer(correctOrder))).toBe(true);
+  });
+
+  describe('validation', () => {
+    it('accepts a well-formed timeline', () => {
+      expect(isValidQuestion(tl)).toBe(true);
+    });
+
+    it('rejects two events, which is a true/false in disguise', () => {
+      expect(isValidQuestion({ ...tl, events: tl.events.slice(0, 2) })).toBe(false);
+    });
+
+    it('rejects more events than anyone wants to drag around', () => {
+      const many = Array.from({ length: 7 }, (_, index) => ({
+        id: `e${index}`,
+        label: `Event ${index}`,
+        date: String(1860 + index),
+      }));
+      expect(isValidQuestion({ ...tl, events: many })).toBe(false);
+    });
+
+    it('rejects duplicate event ids, which make grading ambiguous', () => {
+      const events = [...tl.events.slice(0, 3), { ...tl.events[3], id: 'e0' }];
+      expect(isValidQuestion({ ...tl, events })).toBe(false);
+    });
+
+    /*
+      One of the two slots would be unwinnable however the reader answered,
+      because nothing on screen distinguishes the events.
+    */
+    it('rejects two events that read the same, which nobody could order', () => {
+      const events = [...tl.events.slice(0, 3), { ...tl.events[3], label: 'Bull Run.' }];
+      expect(isValidQuestion({ ...tl, events })).toBe(false);
+    });
+
+    it('rejects an event with no date, since the reveal exists to show them', () => {
+      const events = [...tl.events.slice(0, 3), { ...tl.events[3], date: '  ' }];
+      expect(isValidQuestion({ ...tl, events })).toBe(false);
+    });
+
+    it('accepts two events in the same year, told apart by their month', () => {
+      // "April 1861" and "July 1861" are two distinct slots on the rail, which
+      // is a perfectly good question.
+      expect(isValidQuestion(tl)).toBe(true);
+    });
+
+    /*
+      The dates are the fixed slots the reader drags onto, so a repeated date
+      draws two identical rows — and one of them cannot be got right however
+      they answer.
+    */
+    it('rejects two events sharing a date, which would draw an unwinnable slot', () => {
+      const events = [...tl.events.slice(0, 3), { ...tl.events[3], date: '1863' }];
+      expect(isValidQuestion({ ...tl, events })).toBe(false);
+    });
   });
 });

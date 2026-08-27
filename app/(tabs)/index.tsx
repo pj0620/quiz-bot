@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import {
+  useMemo } from 'react';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { addDays } from '../../src/lib/day';
 import { formatTopic } from '../../src/quiz/topics';
@@ -28,7 +29,7 @@ import { ScoreDots } from '../../src/ui/components/ScoreDots';
 import { SectionHeader } from '../../src/ui/components/SectionHeader';
 import { SegmentedBar } from '../../src/ui/components/SegmentedBar';
 import { StatRow } from '../../src/ui/components/StatRow';
-import { colors, spacing, type } from '../../src/ui/theme';
+import { colors, spacing, themedSheet, type } from '../../src/ui/theme';
 
 const WEEKDAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -252,7 +253,7 @@ export default function StatsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   masteryHead: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
   big: { ...type.title, color: colors.text },
   hint: { ...type.small, color: colors.textMuted, lineHeight: 18 },
@@ -260,4 +261,4 @@ const styles = StyleSheet.create({
   topicCell: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   masteryCell: { width: 44, gap: spacing.xs, alignItems: 'center' },
   score: { ...type.bodyStrong, color: colors.textMuted },
-});
+}));

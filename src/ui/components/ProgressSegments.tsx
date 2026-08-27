@@ -1,19 +1,19 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
-import { colors, radius } from '../theme';
+import { colors, radius, themedSheet, themedTokens } from '../theme';
 import type { Outcome } from '../../quiz/types';
 
 /** One segment per question: unanswered, current, or coloured by outcome. */
 export type SegmentState = Outcome | 'pending' | 'current' | 'flagged';
 
-const SEGMENT_COLORS: Record<SegmentState, string> = {
+const SEGMENT_COLORS = themedTokens<Record<SegmentState, string>>(() => ({
   correct: colors.success,
   partial: colors.warning,
   incorrect: colors.danger,
   flagged: colors.textFaint,
   current: colors.primary,
   pending: colors.surfaceAlt,
-};
+}));
 
 type Props = {
   segments: SegmentState[];
@@ -47,9 +47,9 @@ export function ProgressSegments({ segments, height = 6 }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   row: { flexDirection: 'row', gap: 3, alignItems: 'center' },
   segment: { flex: 1, borderRadius: radius.pill },
   // The current segment reads as "you are here" rather than an outcome.
   current: { opacity: 1 },
-});
+}));

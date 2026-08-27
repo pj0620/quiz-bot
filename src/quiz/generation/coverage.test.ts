@@ -1,4 +1,5 @@
 jest.mock('../../lib/kv', () => ({
+  isStorageDegraded: jest.fn(() => false),
   readJsonSync: jest.fn(() => null),
   writeJson: jest.fn(async () => undefined),
   getItemSync: jest.fn(() => null),
@@ -12,6 +13,8 @@ import { coverageKey, isValidCoverage, MAX_FAILURES, parseCoverage } from './cov
 import {
   clearAllCoverage,
   clearCoverageForSource,
+  clearEmptyCoverage,
+  countEmptyCoverage,
   getCoverage,
   getCoverageFor,
   recordCoverage,
@@ -145,5 +148,47 @@ describe('clearing', () => {
     recordCoverage({ sourceId: 's', path: 'a.md', questionCount: 1 });
     clearAllCoverage();
     expect(getCoverage()).toEqual({});
+  });
+});
+
+describe('retrying the notes that produced nothing', () => {
+  /*
+    A note read for nothing is marked covered and skipped for good, which is
+    right when the note really is a page of screenshots — and wrong when the
+    reason was a rule of ours being too strict. Without a way back, fixing such
+    a rule does nothing for the notes it already skipped.
+  */
+  it('forgets notes that yielded no questions', () => {
+    recordCoverage({ sourceId: 's', path: 'empty.md', questionCount: 0 });
+    recordCoverage({ sourceId: 's', path: 'good.md', questionCount: 4 });
+
+    expect(clearEmptyCoverage()).toBe(1);
+    expect(getCoverageFor('s', 'empty.md')).toBeUndefined();
+    expect(getCoverageFor('s', 'good.md')).toBeDefined();
+  });
+
+  it('leaves a failed note alone, because it still owns its retry count', () => {
+    // A failure has generatedAt 0 and is already retried by the selector;
+    // clearing it here would reset the streak that stops an endless loop.
+    recordFailure({ sourceId: 's', path: 'broken.md', message: 'bad reply' });
+
+    expect(clearEmptyCoverage()).toBe(0);
+    expect(getCoverageFor('s', 'broken.md')?.failures).toBe(1);
+  });
+
+  it('counts what is waiting to be retried', () => {
+    recordCoverage({ sourceId: 's', path: 'a.md', questionCount: 0 });
+    recordCoverage({ sourceId: 's', path: 'b.md', questionCount: 0 });
+    recordCoverage({ sourceId: 's', path: 'c.md', questionCount: 2 });
+
+    expect(countEmptyCoverage()).toBe(2);
+  });
+
+  it('does not write when there is nothing to forget', () => {
+    recordCoverage({ sourceId: 's', path: 'a.md', questionCount: 3 });
+    jest.clearAllMocks();
+
+    expect(clearEmptyCoverage()).toBe(0);
+    expect(mockedWriteJson).not.toHaveBeenCalled();
   });
 });

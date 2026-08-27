@@ -1,9 +1,11 @@
 import type { Answer, AnswerFor, Grade, Question, QuestionFormat } from '../types';
-import type { QuestionOf, QuestionTypeLogic } from './contract';
+import type { AnswerTranscript, QuestionOf, QuestionTypeLogic } from './contract';
 import { fillBlankLogic } from './fillBlank';
 import { listRecallLogic } from './listRecall';
+import { mapLocateLogic } from './mapLocate';
 import { multipleChoiceLogic } from './multipleChoice';
 import { shortAnswerLogic } from './shortAnswer';
+import { timelineLogic } from './timeline';
 import { trueFalseLogic } from './trueFalse';
 
 /**
@@ -23,6 +25,8 @@ const QUESTION_TYPE_LOGIC: { [K in QuestionFormat]: QuestionTypeLogic<QuestionOf
   'short-answer': shortAnswerLogic,
   'list-recall': listRecallLogic,
   'fill-blank': fillBlankLogic,
+  timeline: timelineLogic,
+  'map-locate': mapLocateLogic,
 };
 
 export function getQuestionLogic(format: QuestionFormat): QuestionTypeLogic {
@@ -56,12 +60,25 @@ export function gradeAnswer(question: Question, answer: Answer): Grade {
 
 export function isAnswerComplete(question: Question, answer: Answer | null): boolean {
   const logic = getQuestionLogic(question.format) as QuestionTypeLogic<Question>;
-  return logic.isAnswerComplete(answer as AnswerFor<Question> | null);
+  return logic.isAnswerComplete(answer as AnswerFor<Question> | null, question);
 }
 
 export function summarizeQuestion(question: Question): string {
   const logic = getQuestionLogic(question.format) as QuestionTypeLogic<Question>;
   return logic.summarize(question);
+}
+
+/**
+ * Renders a question and an attempt at it as plain text — see `transcribe`.
+ *
+ * An answer whose format doesn't match the question's is treated as no answer
+ * at all: the pair can't be trusted, and every `transcribe` reads fields that
+ * only exist on its own answer type.
+ */
+export function transcribeAnswer(question: Question, answer: Answer | null): AnswerTranscript {
+  const logic = getQuestionLogic(question.format) as QuestionTypeLogic<Question>;
+  const matched = answer?.format === question.format ? (answer as AnswerFor<Question>) : null;
+  return logic.transcribe(question, matched);
 }
 
 /**

@@ -12,7 +12,11 @@
       "android"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.moatsoftware.quizbot",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -25,14 +29,20 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      "expo-background-task"
     ],
     "extra": {
       "github": {
         "_comment": "Create a GitHub App at github.com/settings/apps/new. Enable Device Flow. Permissions: Contents=Read-only. Then paste the Client ID (Iv23li...) and the app slug from its URL below. Neither value is a secret; do NOT create a client secret.",
         "clientId": "Iv23licnNVzw1nsUBm9L",
         "appSlug": "quizbot-app"
+      },
+      "router": {},
+      "eas": {
+        "projectId": "eea08aa6-b27a-4f9c-8241-3f6c4ed2acf1"
       }
-    }
+    },
+    "owner": "pj0620"
   }
 }

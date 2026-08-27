@@ -1,8 +1,12 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Ionicons } from '@expo/vector-icons';
+import { Pressable,
+  Text,
+  View,
+} from 'react-native';
 
-import { colors, radius, spacing, TOUCH_TARGET, type } from '../theme';
+import { colors, radius, spacing, themedSheet, TOUCH_TARGET, type } from '../theme';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -10,6 +14,14 @@ type Props = {
   title: string;
   subtitle?: string;
   icon?: IoniconName;
+  /**
+   * Overrides the leading icon's tint.
+   *
+   * Exists for the selection checkbox in the question bank: an unticked box has
+   * to read as available rather than as an action, and the default accent makes
+   * every row look like it is already doing something.
+   */
+  iconColor?: string;
   onPress?: () => void;
   disabled?: boolean;
   /** Rendered on the right: a badge, a checkmark, a health dot. */
@@ -21,6 +33,7 @@ export function ListRow({
   title,
   subtitle,
   icon,
+  iconColor,
   onPress,
   disabled = false,
   accessory,
@@ -30,7 +43,11 @@ export function ListRow({
     <>
       {icon ? (
         <View style={styles.iconWrap}>
-          <Ionicons name={icon} size={16} color={disabled ? colors.textFaint : colors.primary} />
+          <Ionicons
+            name={icon}
+            size={16}
+            color={disabled ? colors.textFaint : (iconColor ?? colors.primary)}
+          />
         </View>
       ) : null}
       <View style={styles.textWrap}>
@@ -66,7 +83,7 @@ export function ListRow({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -103,4 +120,4 @@ const styles = StyleSheet.create({
   title: { ...type.bodyStrong, fontSize: 15, color: colors.text },
   subtitle: { ...type.small, color: colors.textMuted },
   dimmed: { color: colors.textFaint },
-});
+}));

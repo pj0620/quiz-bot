@@ -39,3 +39,14 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# local build artifacts
+*.ipa
+build.ipa
+
+screenshots/
+
+# Source boundary data downloaded by scripts/buildGeoData.mjs.
+# The GENERATED output in src/quiz/geography/data is committed; this is just
+# the upstream TopoJSON it was built from, re-fetchable on demand.
+scripts/.geocache/

@@ -1,6 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { colors, spacing, type } from '../theme';
+import { colors, spacing, themedSheet, type } from '../theme';
 import { GRADE_COLORS } from './GradePill';
 import type { LetterGrade } from '../../quiz/stats';
 
@@ -56,7 +56,7 @@ export function ScoreDots({ days }: Props) {
 
 const DOT = 34;
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   row: { flexDirection: 'row', gap: 3 },
   column: { flex: 1, alignItems: 'center', gap: spacing.xs },
   // Fixed so the small skipped dot centres against the full-size ones rather
@@ -67,4 +67,4 @@ const styles = StyleSheet.create({
   skipped: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.surfaceAlt },
   label: { ...type.small, color: colors.textFaint, fontSize: 10 },
   today: { color: colors.primary },
-});
+}));

@@ -2,7 +2,8 @@ import { parseNote } from '../../notes/parse';
 import { noteStem } from '../../notes/paths';
 import { CIVIL_WAR } from '../../notes/__fixtures__/sampleNotes';
 import type { LlmProviderDefinition } from './contract';
-import { generateFromNote } from './generateFromNote';
+import { generateFromNote, MAX_TOKEN_BUDGET } from './generateFromNote';
+import { MAX_QUESTIONS_PER_CALL } from './generateNoteInParts';
 import { getLlmProvider } from './registry';
 import type { CompletionInput, CompletionResult, StopReason } from './types';
 
@@ -12,9 +13,11 @@ function reply(count: number): string {
   return JSON.stringify({
     questions: Array.from({ length: count }, (_, i) => ({
       format: 'true-false',
-      prompt: `A claim about the border states, number ${i}.`,
+      // The paired shape the prompt asks for; the parser picks which half is
+      // shown, so a fixture supplies both and no answer.
+      claim: `A claim about the border states, number ${i}, holds.`,
+      distortion: `A claim about the border states, number ${i}, fails.`,
       explanation: 'Because the notes say so.',
-      correct: true,
     })),
   });
 }
@@ -71,9 +74,43 @@ describe('token budget', () => {
   });
 
   it('scales the budget with the number of questions asked for', async () => {
-    const { calls, promise } = run({}, 20);
+    const { calls, promise } = run({}, 10);
     await promise;
-    expect(calls[0].maxTokens).toBeGreaterThanOrEqual(20 * 1_200);
+    expect(calls[0].maxTokens).toBeGreaterThan(8_000);
+  });
+
+  it('never exceeds the absolute ceiling, whatever it is asked for', async () => {
+    /*
+      The model id is free text in Settings, so a budget above that model's
+      maximum output is an HTTP 400 — not a bigger budget. Every note in the run
+      would then fail identically and count towards being permanently skipped.
+    */
+    for (const count of [10, 30, 500]) {
+      const { calls, promise } = run({}, count);
+      await promise;
+      expect(calls[0].maxTokens).toBeLessThanOrEqual(MAX_TOKEN_BUDGET);
+    }
+  });
+
+  it('leaves room for a full call’s worth of questions on top of the thinking', async () => {
+    /*
+      The invariant that keeps the two ceilings honest. `MAX_QUESTIONS_PER_CALL`
+      questions must fit inside `MAX_TOKEN_BUDGET` WITH the reasoning headroom
+      still intact — otherwise the token cap silently truncates the question cap
+      and the reply comes back cut off, which is discarded whole.
+
+      This is what the old numbers got wrong: at 1,600 tokens a question, ten
+      questions consumed the entire 16,000 budget and left nothing for thinking,
+      so the ceiling could never rise.
+    */
+    const { calls, promise } = run({}, MAX_QUESTIONS_PER_CALL);
+    await promise;
+    expect(calls[0].maxTokens).toBe(MAX_TOKEN_BUDGET);
+
+    // A measured question costs ~356 output tokens, so a full call needs well
+    // under half the budget and the rest is headroom.
+    const forQuestions = MAX_QUESTIONS_PER_CALL * 400;
+    expect(MAX_TOKEN_BUDGET - forQuestions).toBeGreaterThanOrEqual(8_000);
   });
 
   it('always asks for JSON', async () => {
@@ -136,10 +173,34 @@ describe('success', () => {
     expect(outcome.elapsedMs).toBeGreaterThanOrEqual(0);
   });
 
+  it('carries the reader’s own instructions into the system prompt', async () => {
+    // The whole point of the Settings field: if it doesn't reach the request,
+    // it is a text box that does nothing.
+    const { provider, calls } = fakeProvider({});
+    await generateFromNote({
+      note,
+      path: CIVIL_WAR.path,
+      sourceId: 'src-1',
+      provider,
+      apiKey: 'sk-test',
+      model: 'test-model',
+      count: 5,
+      guidance: 'Ask more about people than about dates.',
+    });
+
+    expect(calls[0].system).toContain('Ask more about people than about dates.');
+  });
+
+  it('sends the plain prompt when no instructions were written', async () => {
+    const { calls, promise } = run({});
+    await promise;
+    expect(calls[0].system).not.toContain('FROM THE READER');
+  });
+
   it('keeps the usable questions when some rows were rejected', async () => {
     const mixed = JSON.stringify({
       questions: [
-        { format: 'true-false', prompt: 'Good one.', explanation: 'Yes.', correct: true },
+        { format: 'true-false', claim: 'Good one.', distortion: 'Bad one.', explanation: 'Yes.' },
         { format: 'essay', prompt: 'Bad one.' },
       ],
     });

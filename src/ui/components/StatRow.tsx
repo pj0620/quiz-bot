@@ -1,6 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { colors, radius, spacing, type } from '../theme';
+import { colors, radius, spacing, themedSheet, themedTokens, type } from '../theme';
 
 export type Stat = {
   label: string;
@@ -8,13 +8,13 @@ export type Stat = {
   tone?: 'default' | 'success' | 'warning' | 'danger' | 'muted';
 };
 
-const TONE_COLORS = {
+const TONE_COLORS = themedTokens(() => ({
   default: colors.text,
   success: colors.success,
   warning: colors.warning,
   danger: colors.danger,
   muted: colors.textMuted,
-} as const;
+} as const));
 
 type Props = {
   stats: Stat[];
@@ -42,7 +42,7 @@ export function StatRow({ stats }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   row: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
@@ -55,4 +55,4 @@ const styles = StyleSheet.create({
   divided: { borderLeftWidth: 1, borderLeftColor: colors.border },
   value: { ...type.heading, fontSize: 22 },
   label: { ...type.small, fontSize: 12, color: colors.textMuted, textAlign: 'center' },
-});
+}));

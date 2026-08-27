@@ -1,16 +1,16 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { colors, radius, spacing, type } from '../theme';
+import { colors, radius, spacing, themedSheet, themedTokens, type } from '../theme';
 
 export type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger';
 
-const TONES: Record<BadgeTone, { bg: string; fg: string }> = {
+const TONES = themedTokens<Record<BadgeTone, { bg: string; fg: string }>>(() => ({
   neutral: { bg: colors.surfaceAlt, fg: colors.textMuted },
   primary: { bg: colors.surfaceAlt, fg: colors.primary },
   success: { bg: colors.successSurface, fg: colors.success },
   warning: { bg: colors.warningSurface, fg: colors.warning },
   danger: { bg: colors.dangerSurface, fg: colors.danger },
-};
+}));
 
 type Props = {
   label: string;
@@ -27,7 +27,7 @@ export function Badge({ label, tone = 'neutral' }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   badge: {
     borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
@@ -35,4 +35,4 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   label: { ...type.small, fontWeight: '600' },
-});
+}));

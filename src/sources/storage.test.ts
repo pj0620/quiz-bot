@@ -1,6 +1,7 @@
 // storage.ts imports the kv layer, which pulls in expo-sqlite's native module —
 // unresolvable under jest and irrelevant to these pure-function tests.
 jest.mock('../lib/kv', () => ({
+  isStorageDegraded: jest.fn(() => false),
   readJsonSync: jest.fn(() => null),
   writeJson: jest.fn(async () => undefined),
 }));

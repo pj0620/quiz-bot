@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { QuizEditor } from '../../../src/features/quiz/QuizEditor';
 import { useQuiz } from '../../../src/quiz/useQuiz';
+import { CrtOverlay } from '../../../src/ui/components/CrtOverlay';
 import { EmptyState } from '../../../src/ui/components/EmptyState';
 import { Screen } from '../../../src/ui/components/Screen';
 
@@ -22,6 +23,8 @@ export default function EditQuizScreen() {
     <>
       <Stack.Screen options={{ title: `Edit ${quiz.name}` }} />
       <QuizEditor existing={quiz} />
+      {/* Modal presentation escapes the root layout's copy; see CrtOverlay. */}
+      <CrtOverlay />
     </>
   );
 }

@@ -1,6 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState } from 'react';
+import { Stack,
+  useLocalSearchParams,
+  useRouter } from 'expo-router';
+import { ActivityIndicator,
+  Alert,
+  Pressable,
+  Text,
+  View,
+} from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
 import { GITHUB } from '../../src/features/github/config';
@@ -18,7 +29,7 @@ import { Callout } from '../../src/ui/components/Callout';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ErrorBanner } from '../../src/ui/components/ErrorBanner';
 import { Screen } from '../../src/ui/components/Screen';
-import { colors, radius, spacing, type } from '../../src/ui/theme';
+import { colors, radius, spacing, themedSheet, type } from '../../src/ui/theme';
 
 const MAX_LISTED_FILES = 200;
 const MAX_PREVIEW_SECTIONS = 12;
@@ -184,6 +195,22 @@ export default function SourceDetailScreen() {
     );
   }, [source, router]);
 
+  const allFiles = listing?.files ?? [];
+  // What the app can actually use. The gap between this and `allFiles` is the
+  // most useful thing on the screen when someone connects the wrong repository.
+  //
+  // Computed above the not-found return, not beside its only use below it:
+  // removing the source re-renders this screen with `source` undefined while it
+  // is still mounted for the back transition, and a hook after that return
+  // would vanish mid-lifetime.
+  const notes = useMemo(
+    () =>
+      allFiles
+        .filter((file) => isNotePath(file.path))
+        .map((file) => ({ path: file.path, ...parseNoteName(noteStem(file.path)) })),
+    [allFiles],
+  );
+
   if (!source || !definition) {
     return (
       <Screen>
@@ -198,17 +225,6 @@ export default function SourceDetailScreen() {
       </Screen>
     );
   }
-
-  const allFiles = listing?.files ?? [];
-  // What the app can actually use. The gap between this and `allFiles` is the
-  // most useful thing on the screen when someone connects the wrong repository.
-  const notes = useMemo(
-    () =>
-      allFiles
-        .filter((file) => isNotePath(file.path))
-        .map((file) => ({ path: file.path, ...parseNoteName(noteStem(file.path)) })),
-    [allFiles],
-  );
 
   return (
     <>
@@ -438,7 +454,7 @@ function DevDiagnostics() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   card: {
     backgroundColor: colors.background,
     borderWidth: 1,
@@ -474,4 +490,4 @@ const styles = StyleSheet.create({
   previewBody: { ...type.small, color: colors.textMuted, lineHeight: 18 },
   mutedText: { color: colors.textFaint },
   devOutput: { ...type.mono, color: colors.textMuted },
-});
+}));

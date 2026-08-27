@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { accents, colors, spacing, type, type AccentName } from '../theme';
+import { accents, colors, spacing, themedSheet, type, type AccentName } from '../theme';
 
 type Props = {
   title: string;
@@ -29,7 +29,7 @@ export function SectionHeader({ title, accessory, accent = 'primary' }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -44,4 +44,4 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   spacer: { flex: 1 },
-});
+}));

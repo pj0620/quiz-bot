@@ -1,5 +1,11 @@
 import { outcomeFromSelfGrade, type Grade, type ShortAnswerAnswer, type ShortAnswerQuestion } from '../types';
-import { hasValidQuestionBase, normalizeAnswerText, type QuestionTypeLogic } from './contract';
+import {
+  bulleted,
+  hasValidQuestionBase,
+  normalizeAnswerText,
+  type AnswerTranscript,
+  type QuestionTypeLogic,
+} from './contract';
 
 export const shortAnswerLogic: QuestionTypeLogic<ShortAnswerQuestion> = {
   format: 'short-answer',
@@ -63,6 +69,19 @@ export const shortAnswerLogic: QuestionTypeLogic<ShortAnswerQuestion> = {
 
   summarize(): string {
     return 'Written answer';
+  },
+
+  transcribe(question, answer): AnswerTranscript {
+    const text = answer?.text.trim();
+    return {
+      // The rubric, when there is one — it's the marking scheme, and it tells
+      // whoever reads this what the answer was supposed to cover.
+      detail: question.rubric?.length
+        ? `A good answer covers:\n${bulleted(question.rubric)}`
+        : undefined,
+      given: text || undefined,
+      expected: question.modelAnswer,
+    };
   },
 };
 

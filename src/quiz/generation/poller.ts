@@ -1,4 +1,4 @@
-import { getLlmSettings } from '../../features/llm/settings';
+import { getConcurrency, getLlmSettings } from '../../features/llm/settings';
 import { getSourceType } from '../../sources/registry';
 import { getSources } from '../../sources/store';
 import type { InfoSource } from '../../sources/types';
@@ -6,7 +6,7 @@ import { addQuestions, getQuestions } from '../store';
 import { recordCoverage, recordFailure } from './coverageStore';
 import { createLlmGenerator } from './llmGenerator';
 import { noteGenerator } from './noteGenerator';
-import type { NoteGenerationEvent, QuestionGenerator } from './contract';
+import type { NoteGenerationEvent, PlannedNote, QuestionGenerator } from './contract';
 
 /**
  * Runs generation over the connected sources.
@@ -16,17 +16,25 @@ import type { NoteGenerationEvent, QuestionGenerator } from './contract';
  * lets a generator be tested with a fake provider and no stores at all.
  */
 
-const DEFAULT_TARGET_QUESTIONS = 25;
-
 /**
- * Cost ceiling per source, independent of the question target.
+ * The budget for a run, and its cost ceiling.
  *
- * Each note is one provider request plus one model call, so a high target over
- * short notes could otherwise run for a long time and spend real money.
+ * Notes, not questions. A note is at least one model request and a long one is
+ * several, so this is the only number that predicts what a run will cost — a
+ * question total cannot, now that a note yields as many as its material is
+ * worth.
  */
 const DEFAULT_MAX_NOTES = 8;
 
 export type RunProgress = {
+  /**
+   * Which source the note came from.
+   *
+   * The event itself carries only a path, because a generator only ever works
+   * inside one source and has no reason to repeat it. A caller watching a run
+   * across several sources does need it — two vaults can hold the same path.
+   */
+  sourceId: string;
   event: NoteGenerationEvent;
   /** Questions saved across the whole run so far. */
   addedSoFar: number;
@@ -37,8 +45,13 @@ export type RunOptions = {
   targetQuestions?: number;
   maxNotes?: number;
   folders?: string[];
+  /** Notes at once. Defaults to the user's choice in Settings. */
+  concurrency?: number;
   signal?: AbortSignal;
   now?: number;
+  /** The notes a source picked, before any of them is read. Fires once per source. */
+  onPlan?: (notes: PlannedNote[]) => void;
+  onNoteStart?: (note: PlannedNote) => void;
   onProgress?: (progress: RunProgress) => void;
 };
 
@@ -86,12 +99,15 @@ export async function pollSource(
   const result = await generator.generate({
     source,
     provider: definition.provider,
-    targetQuestions: options.targetQuestions ?? DEFAULT_TARGET_QUESTIONS,
+    targetQuestions: options.targetQuestions,
     maxNotes: options.maxNotes ?? DEFAULT_MAX_NOTES,
     folders: options.folders,
+    concurrency: options.concurrency ?? getConcurrency(),
     existingIds,
     signal: options.signal,
     now: options.now,
+    onPlan: options.onPlan,
+    onNoteStart: options.onNoteStart,
 
     /*
       Saved per note, not at the end.
@@ -127,7 +143,7 @@ export async function pollSource(
         }
       }
 
-      options.onProgress?.({ event, addedSoFar: added, notesDone });
+      options.onProgress?.({ sourceId: source.id, event, addedSoFar: added, notesDone });
     },
   });
 

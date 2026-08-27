@@ -1,5 +1,10 @@
 import type { FillBlankAnswer, FillBlankQuestion, Grade } from '../types';
-import { hasValidQuestionBase, normalizeAnswerText, type QuestionTypeLogic } from './contract';
+import {
+  hasValidQuestionBase,
+  normalizeAnswerText,
+  type AnswerTranscript,
+  type QuestionTypeLogic,
+} from './contract';
 
 /** Matches the {{blankId}} placeholders in a template. */
 const PLACEHOLDER = /\{\{([a-zA-Z0-9_-]+)\}\}/g;
@@ -64,11 +69,17 @@ export const fillBlankLogic: QuestionTypeLogic<FillBlankQuestion> = {
     return { status: 'graded', outcome, score, parts };
   },
 
-  /** Every blank must have something in it — a partial submission isn't ready. */
-  isAnswerComplete(answer): boolean {
+  /**
+   * Every blank must have something in it — a partial submission isn't ready.
+   *
+   * Checked against the QUESTION's blanks, not against the keys present in the
+   * answer. The view only writes a key once a blank has been typed into, so
+   * counting `answer.values` let a two-blank question be checked with one blank
+   * still empty.
+   */
+  isAnswerComplete(answer, question): boolean {
     if (!answer) return false;
-    const values = Object.values(answer.values);
-    return values.length > 0 && values.every((value) => value.trim().length > 0);
+    return question.blanks.every((blank) => (answer.values[blank.id] ?? '').trim().length > 0);
   },
 
   isValid(value): value is FillBlankQuestion {
@@ -102,7 +113,35 @@ export const fillBlankLogic: QuestionTypeLogic<FillBlankQuestion> = {
     const count = question.blanks.length;
     return `${count} blank${count === 1 ? '' : 's'}`;
   },
+
+  /*
+    Both sides are the WHOLE sentence, filled in.
+
+    A bare list of what went in each blank is unreadable away from the screen —
+    the blanks have ids, not names. Two versions of the same sentence put the
+    reader's wording and the note's side by side, which is the comparison they
+    were going to make anyway.
+  */
+  transcribe(question, answer): AnswerTranscript {
+    const typed = question.blanks.some((blank) => (answer?.values[blank.id] ?? '').trim());
+    return {
+      given: typed ? fillTemplate(question.template, (id) => answer?.values[id]) : undefined,
+      // The first accepted spelling stands for the rest — the alternatives are
+      // a grading tolerance, not several different right answers.
+      expected: fillTemplate(
+        question.template,
+        (id) => question.blanks.find((blank) => blank.id === id)?.accepted[0],
+      ),
+    };
+  },
 };
+
+/** The template as a finished sentence, with `____` wherever nothing was given. */
+function fillTemplate(template: string, valueFor: (blankId: string) => string | undefined): string {
+  return parseTemplate(template)
+    .map((run) => (run.kind === 'text' ? run.text : valueFor(run.blankId)?.trim() || '____'))
+    .join('');
+}
 
 export function fillBlankAnswer(values: Record<string, string>): FillBlankAnswer {
   return { format: 'fill-blank', values };

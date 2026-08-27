@@ -1,6 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { colors, radius, type } from '../theme';
+import { colors, radius, themedSheet, themedTokens, type } from '../theme';
 import type { LetterGrade } from '../../quiz/stats';
 
 /**
@@ -11,21 +11,21 @@ import type { LetterGrade } from '../../quiz/stats';
  * changes nothing about what you would do next. Shared with `ScoreDots` so a
  * grade means the same colour wherever it appears.
  */
-export const GRADE_COLORS: Record<LetterGrade, string> = {
+export const GRADE_COLORS = themedTokens<Record<LetterGrade, string>>(() => ({
   A: colors.success,
   B: colors.primary,
   C: colors.primary,
   D: colors.danger,
   F: colors.danger,
-};
+}));
 
-const GRADE_SURFACES: Record<LetterGrade, string> = {
+const GRADE_SURFACES = themedTokens<Record<LetterGrade, string>>(() => ({
   A: colors.successSurface,
   B: colors.primarySurface,
   C: colors.primarySurface,
   D: colors.dangerSurface,
   F: colors.dangerSurface,
-};
+}));
 
 type Props = {
   /** Null renders the "not attempted yet" state rather than an F. */
@@ -69,7 +69,7 @@ export function GradePill({ grade, score, size = 'md' }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   pill: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -86,4 +86,4 @@ const styles = StyleSheet.create({
   score: { ...type.micro, fontSize: 10, opacity: 0.85 },
   empty: { backgroundColor: colors.surfaceRaised },
   emptyText: { color: colors.textFaint },
-});
+}));

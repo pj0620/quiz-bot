@@ -1,4 +1,5 @@
 import { seededShuffle } from '../../lib/random';
+import type { SelectionMode } from '../preferences';
 import { daysUntilDue, isDue, isLeech, isNew } from '../srs/schedule';
 import type { Question, QuizRule, ReviewState } from '../types';
 import { matchesRule } from './matchesRule';
@@ -22,6 +23,8 @@ export type SelectionInput = {
   seed: number;
   /** Question ids to leave out — used by "review what I missed". */
   exclude?: readonly string[];
+  /** Defaults to `spaced`, which is what every caller did before this existed. */
+  mode?: SelectionMode;
 };
 
 export type SelectionResult = {
@@ -42,7 +45,60 @@ const NEW_RATIO: Record<QuizRule['mix'], number> = {
   'review-only': 0,
 };
 
+/**
+ * A flat draw: every question the rule matches, equally likely.
+ *
+ * Three pieces of weighting come off, and it is worth naming them because they
+ * are the whole difference between the modes:
+ *
+ *  - The new/review quota. `NEW_RATIO` reserves half a session for unseen
+ *    questions, which makes an unseen question far likelier than a seen one
+ *    whenever the bank holds more of the latter.
+ *  - The overdue ordering. `sortedDue` takes the most overdue first, so a
+ *    question due by a week is certain and one due by an hour never appears.
+ *  - The eligibility filters. `isDue` holds back everything the schedule
+ *    considers resting, and `isLeech` permanently drops questions that have
+ *    been failed repeatedly. Between them these can make most of a bank
+ *    unreachable on any given day.
+ *
+ * What stays is `mix`, because that is the RULE rather than a weighting: a quiz
+ * that says "review only" still means it, and honouring the rule while dropping
+ * the weighting is the point. A leech is deliberately eligible again here —
+ * "equal probability of any question" has to include the awkward ones, and a
+ * uniform draw is exactly the thing that stops one of them dominating.
+ */
+function selectEvenly(input: SelectionInput): SelectionResult {
+  const { bank, reviewStates, rule, now, seed, exclude } = input;
+  const excluded = exclude?.length ? new Set(exclude) : null;
+
+  const pool = bank.filter((question) => {
+    if (excluded?.has(question.id)) return false;
+    const state = reviewStates[question.id];
+    if (!matchesRule(question, rule, state, now)) return false;
+    if (rule.mix === 'new-only') return isNew(state);
+    if (rule.mix === 'review-only') return !isNew(state);
+    return true;
+  });
+
+  const size = Math.max(0, Math.floor(rule.size));
+  const questions = seededShuffle(pool, seed).slice(0, size);
+
+  // Counted from what was actually drawn, not from the pool — the caller uses
+  // these to label the session, and a pool figure would describe a session the
+  // user is not about to sit.
+  let newCount = 0;
+  for (const question of questions) if (isNew(reviewStates[question.id])) newCount += 1;
+
+  return {
+    questions,
+    shortfall: Math.max(0, size - questions.length),
+    counts: { new: newCount, due: questions.length - newCount, total: questions.length },
+  };
+}
+
 export function selectQuestions(input: SelectionInput): SelectionResult {
+  if (input.mode === 'even') return selectEvenly(input);
+
   const { bank, reviewStates, rule, now, seed, exclude } = input;
   const excluded = exclude?.length ? new Set(exclude) : null;
 

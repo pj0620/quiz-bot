@@ -1,6 +1,6 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
-import { colors, radius, spacing, type } from '../theme';
+import { colors, radius, spacing, themedSheet, type } from '../theme';
 
 type Props = {
   code: string;
@@ -39,10 +39,10 @@ export function CodeBlock({ code, maxChars = 4000, maxHeight = 320, caption }: P
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   wrapper: { gap: spacing.xs },
   caption: { ...type.small, color: colors.textMuted },
   box: { backgroundColor: colors.code, borderRadius: radius.sm },
   content: { padding: spacing.md },
   code: { ...type.mono, color: colors.codeText, lineHeight: 18 },
-});
+}));

@@ -1,6 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState } from 'react';
 import { useRouter } from 'expo-router';
-import { AppState, type AppStateStatus, StyleSheet, Text, View } from 'react-native';
+import { AppState,
+  type AppStateStatus,
+  Text,
+  View,
+} from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
 import { requireGitHubConfig } from '../../../src/config/env';
@@ -14,7 +22,7 @@ import { SectionHeader } from '../../../src/ui/components/SectionHeader';
 import { Callout } from '../../../src/ui/components/Callout';
 import { ErrorBanner } from '../../../src/ui/components/ErrorBanner';
 import { Screen } from '../../../src/ui/components/Screen';
-import { colors, spacing, type } from '../../../src/ui/theme';
+import { colors, spacing, themedSheet, type } from '../../../src/ui/theme';
 
 /** GitHub's installation state can lag a second or two behind the browser. */
 const RECHECK_ATTEMPTS = 10;
@@ -178,7 +186,7 @@ export default function InstallScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   heading: { ...type.heading, color: colors.text },
   body: { ...type.body, color: colors.textMuted, lineHeight: 22 },
   emphasis: { ...type.bodyStrong, color: colors.text },
@@ -195,4 +203,4 @@ const styles = StyleSheet.create({
   },
   accountName: { ...type.bodyStrong, color: colors.text },
   accountMeta: { ...type.small, color: colors.textMuted },
-});
+}));

@@ -1,7 +1,11 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Ionicons } from '@expo/vector-icons';
+import { Pressable,
+  Text,
+  View,
+} from 'react-native';
 
-import { colors, radius, spacing, TOUCH_TARGET, type } from '../theme';
+import { colors, radius, spacing, themedSheet, themedTokens, TOUCH_TARGET, type } from '../theme';
 
 /**
  * The five visual states an answer option moves through.
@@ -20,13 +24,15 @@ type Props = {
   annotation?: string;
 };
 
-const ICONS: Record<ChoiceState, { name: keyof typeof Ionicons.glyphMap; color: string } | null> = {
+const ICONS = themedTokens<
+  Record<ChoiceState, { name: keyof typeof Ionicons.glyphMap; color: string } | null>
+>(() => ({
   idle: { name: 'ellipse-outline', color: colors.textFaint },
   selected: { name: 'radio-button-on', color: colors.primary },
   correct: { name: 'checkmark-circle', color: colors.success },
   incorrect: { name: 'close-circle', color: colors.danger },
   muted: { name: 'ellipse-outline', color: colors.textFaint },
-};
+}));
 
 export function ChoiceRow({ label, state, onPress, disabled, annotation }: Props) {
   const icon = ICONS[state];
@@ -55,7 +61,7 @@ export function ChoiceRow({ label, state, onPress, disabled, annotation }: Props
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -80,4 +86,4 @@ const styles = StyleSheet.create({
   label: { ...type.body, color: colors.text },
   mutedText: { color: colors.textMuted },
   annotation: { ...type.small, color: colors.textMuted },
-});
+}));

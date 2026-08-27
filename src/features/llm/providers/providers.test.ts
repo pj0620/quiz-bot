@@ -68,6 +68,26 @@ describe('anthropic request shaping', () => {
   it('always sends max_tokens, which the API requires', () => {
     expect(bodyOf(spec).max_tokens).toBe(2048);
   });
+
+  it('sends effort only to models known to accept it', () => {
+    // The model field is free text; an unsupported parameter is a 400 on every
+    // note of a run, so the gate fails closed on anything unrecognised.
+    const supported = bodyOf(anthropic.buildRequest({ ...input, model: 'claude-sonnet-5', effort: 'medium' }));
+    expect(supported.output_config).toEqual({ effort: 'medium' });
+
+    const haiku = bodyOf(
+      anthropic.buildRequest({ ...input, model: 'claude-haiku-4-5-20251001', effort: 'medium' }),
+    );
+    expect(haiku.output_config).toBeUndefined();
+
+    const unknown = bodyOf(anthropic.buildRequest({ ...input, effort: 'medium' }));
+    expect(unknown.output_config).toBeUndefined();
+  });
+
+  it('omits output_config entirely when no effort is asked for', () => {
+    // Marking passes no effort; its requests must be byte-identical to before.
+    expect(bodyOf(anthropic.buildRequest({ ...input, model: 'claude-sonnet-5' })).output_config).toBeUndefined();
+  });
 });
 
 describe('anthropic response parsing', () => {
@@ -127,6 +147,17 @@ describe('openai request shaping', () => {
   it('asks for JSON only when requested', () => {
     expect(bodyOf(spec).response_format).toEqual({ type: 'json_object' });
     expect(bodyOf(openai.buildRequest({ ...input, json: false })).response_format).toBeUndefined();
+  });
+
+  it('sends reasoning_effort only to models known to accept it', () => {
+    const supported = bodyOf(openai.buildRequest({ ...input, model: 'gpt-5.6-terra', effort: 'medium' }));
+    expect(supported.reasoning_effort).toBe('medium');
+
+    // Non-reasoning models reject the parameter outright.
+    const unknown = bodyOf(openai.buildRequest({ ...input, model: 'gpt-4o', effort: 'medium' }));
+    expect(unknown.reasoning_effort).toBeUndefined();
+
+    expect(bodyOf(openai.buildRequest({ ...input, model: 'gpt-5.6-terra' })).reasoning_effort).toBeUndefined();
   });
 });
 

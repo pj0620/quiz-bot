@@ -1,8 +1,9 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import {
+  Ionicons } from '@expo/vector-icons';
+import { Text, View, type ViewStyle } from 'react-native';
 
-import { accents, colors, elevation, radius, spacing, type, type AccentName } from '../theme';
+import { accents, colors, elevation, radius, spacing, themedSheet, type, type AccentName } from '../theme';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -69,7 +70,7 @@ export function Card({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -100,4 +101,4 @@ const styles = StyleSheet.create({
   title: { ...type.bodyStrong, color: colors.text, flex: 1 },
   spacer: { flex: 1 },
   footer: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, gap: spacing.sm },
-});
+}));

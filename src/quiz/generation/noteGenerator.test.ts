@@ -9,6 +9,7 @@ import type { SourceContentProvider } from '../../sources/contract';
 import type { GitHubRepoSource } from '../../sources/types';
 import { isValidQuestion } from '../questionTypes/registry';
 import { chooseCloze, noteGenerator } from './noteGenerator';
+import type { NoteGenerationEvent, PlannedNote } from './contract';
 
 const source: GitHubRepoSource = {
   id: 'github-repo:1',
@@ -44,7 +45,15 @@ const NOTES = [CIVIL_WAR, FORT_SUMTER, ANCHORING, EMBED_ONLY_NOTE];
 const provider = fakeProvider(NOTES);
 
 function generate(
-  options: { provider?: SourceContentProvider; limit?: number; folders?: string[] } = {},
+  options: {
+    provider?: SourceContentProvider;
+    limit?: number;
+    folders?: string[];
+    concurrency?: number;
+    onPlan?: (notes: PlannedNote[]) => void;
+    onNoteStart?: (note: PlannedNote) => void;
+    onNote?: (event: NoteGenerationEvent) => void;
+  } = {},
 ) {
   return noteGenerator.generate({
     source,
@@ -52,9 +61,74 @@ function generate(
     targetQuestions: options.limit ?? 40,
     maxNotes: 60,
     folders: options.folders,
+    concurrency: options.concurrency,
+    onPlan: options.onPlan,
+    onNoteStart: options.onNoteStart,
+    onNote: options.onNote,
     now: 1_760_000_000_000,
   });
 }
+
+describe('noteGenerator — reporting progress', () => {
+  it('names every note it will read before reading any of them', async () => {
+    let planned: PlannedNote[] = [];
+    await generate({ onPlan: (notes) => (planned = notes) });
+
+    expect(planned.map((note) => note.path).sort()).toEqual(NOTES.map((note) => note.path).sort());
+    // Full filenames, so the progress list matches what is in the vault.
+    expect(planned.every((note) => note.noteTitle.endsWith('.md'))).toBe(true);
+  });
+
+  it('announces each note as its read starts', async () => {
+    const started: string[] = [];
+    await generate({ onNoteStart: (note) => started.push(note.path) });
+    expect(started.sort()).toEqual(NOTES.map((note) => note.path).sort());
+  });
+
+  it('reports a note it could not read, instead of leaving it hanging', async () => {
+    // Its row would otherwise sit at "working" for good — a result that never
+    // arrives reads as a stuck app rather than as one bad file.
+    const broken = fakeProvider(NOTES.slice(0, 2));
+    const events: NoteGenerationEvent[] = [];
+    await noteGenerator.generate({
+      source,
+      // Lists four notes but can only read two of them.
+      provider: {
+        ...broken,
+        listFiles: async () => ({
+          files: NOTES.map((note) => ({ path: note.path })),
+          truncated: false,
+          revision: 'a1b2c3d4e5f6',
+        }),
+      },
+      maxNotes: 60,
+      now: 1_760_000_000_000,
+      onNote: (event) => events.push(event),
+    });
+
+    const failures = events.filter((event) => event.error);
+    expect(failures).toHaveLength(2);
+    expect(failures.every((event) => event.questions.length === 0)).toBe(true);
+  });
+
+  it('gives the same questions however many notes are read at once', async () => {
+    /*
+      Reads run in parallel, so replies arrive in whatever order the network
+      decides — but position in the loaded list feeds the backdating that
+      spreads questions across a window for the Daily quiz. Writing by index
+      rather than appending on arrival is what keeps that stable.
+    */
+    const sequential = await generate({ concurrency: 1 });
+    const parallel = await generate({ concurrency: 4 });
+
+    expect(parallel.questions.map((question) => question.id)).toEqual(
+      sequential.questions.map((question) => question.id),
+    );
+    expect(parallel.questions.map((question) => question.addedAt)).toEqual(
+      sequential.questions.map((question) => question.addedAt),
+    );
+  });
+});
 
 describe('noteGenerator — what it reads', () => {
   it('reads only markdown notes', async () => {
@@ -314,5 +388,95 @@ describe('chooseCloze', () => {
 
   it('gives up rather than blanking a word guessable from grammar', () => {
     expect(chooseCloze('it was so and it was not')).toBeNull();
+  });
+});
+
+describe('timeline questions from a dated list', () => {
+  /** A note that states its own chronology, which is the only kind this reads. */
+  const DATED_NOTE = {
+    path: 'History/War in the East.md',
+    content: `# War in the East
+
+## Key moments
+
+Listed out of order, as they were written down.
+
+- 1863 — The Emancipation Proclamation takes effect
+- 1861 — Fort Sumter is shelled
+- 1865 — Lee surrenders at Appomattox
+- 1862 — Antietam
+`,
+  };
+
+  async function timelinesFrom(note: { path: string; content: string }) {
+    const result = await generate({ provider: fakeProvider([note]) });
+    return result.questions.filter((question) => question.format === 'timeline');
+  }
+
+  it('builds a timeline out of a list of dated bullets', async () => {
+    const [timeline] = await timelinesFrom(DATED_NOTE);
+    expect(timeline).toBeDefined();
+    expect(isValidQuestion(timeline)).toBe(true);
+  });
+
+  it('orders the events even though the note lists them out of order', async () => {
+    const [timeline] = await timelinesFrom(DATED_NOTE);
+    if (!timeline || timeline.format !== 'timeline') throw new Error('expected a timeline');
+
+    expect(timeline.events.map((event) => event.date)).toEqual(['1861', '1862', '1863', '1865']);
+    expect(timeline.events[0].label).toBe('Fort Sumter is shelled');
+  });
+
+  it('keeps the year out of the event labels, which is the whole question', async () => {
+    const [timeline] = await timelinesFrom(DATED_NOTE);
+    if (!timeline || timeline.format !== 'timeline') throw new Error('expected a timeline');
+
+    for (const event of timeline.events) {
+      expect(event.label).not.toMatch(/\d{4}/);
+    }
+  });
+
+  /*
+    Two bullets sharing a year cannot be ordered FROM THE NOTE, and choosing
+    which goes first would be exactly the invention this generator exists not
+    to do.
+  */
+  it('refuses a list where two bullets share a year', async () => {
+    const ambiguous = {
+      path: 'History/Ambiguous.md',
+      content: `# Ambiguous
+
+## Moments
+
+- 1861 — Fort Sumter is shelled
+- 1861 — Bull Run
+- 1865 — Lee surrenders
+`,
+    };
+    expect(await timelinesFrom(ambiguous)).toHaveLength(0);
+  });
+
+  it('leaves an undated list alone, rather than inventing an order for it', async () => {
+    const undated = {
+      path: 'History/Undated.md',
+      content: `# Undated
+
+## Advantages
+
+- Population
+- Industry
+- Railways
+`,
+    };
+    expect(await timelinesFrom(undated)).toHaveLength(0);
+  });
+
+  it('prefers ordering a dated list to naming it', async () => {
+    // Both structural builders fit a dated list; asking one list to be both
+    // named and ordered in the same section is one question too many about it.
+    const result = await generate({ provider: fakeProvider([DATED_NOTE]) });
+    const formats = result.questions.map((question) => question.format);
+    expect(formats).toContain('timeline');
+    expect(formats).not.toContain('list-recall');
   });
 });

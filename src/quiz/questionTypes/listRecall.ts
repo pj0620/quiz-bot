@@ -1,5 +1,11 @@
 import type { Grade, ListRecallAnswer, ListRecallQuestion } from '../types';
-import { hasValidQuestionBase, normalizeAnswerText, type QuestionTypeLogic } from './contract';
+import {
+  bulleted,
+  hasValidQuestionBase,
+  normalizeAnswerText,
+  type AnswerTranscript,
+  type QuestionTypeLogic,
+} from './contract';
 
 /**
  * Below this length a containment match is meaningless — "war" would match
@@ -76,6 +82,17 @@ export const listRecallLogic: QuestionTypeLogic<ListRecallQuestion> = {
 
   summarize(question): string {
     return `Name ${question.required} of ${question.items.length}`;
+  },
+
+  transcribe(question, answer): AnswerTranscript {
+    const entries = answer?.entries.map((entry) => entry.trim()).filter(Boolean) ?? [];
+    return {
+      given: entries.length > 0 ? bulleted(entries) : undefined,
+      // The WHOLE list, with the bar stated: "you needed 3 of these 4" is the
+      // fact a reader needs to judge their own answer, and it is not in either
+      // the prompt or the entries on their own.
+      expected: `Any ${question.required} of:\n${bulleted(question.items)}`,
+    };
   },
 };
 

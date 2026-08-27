@@ -1,4 +1,5 @@
 jest.mock('../lib/kv', () => ({
+  isStorageDegraded: jest.fn(() => false),
   readJsonSync: jest.fn(() => null),
   writeJson: jest.fn(async () => undefined),
   getItemSync: jest.fn(() => null),

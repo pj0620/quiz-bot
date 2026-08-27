@@ -1,7 +1,11 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Ionicons } from '@expo/vector-icons';
+import { Pressable,
+  Text,
+  View,
+} from 'react-native';
 
-import { colors, radius, spacing, type } from '../../../ui/theme';
+import { colors, radius, spacing, themedSheet, type } from '../../../ui/theme';
 
 type Props = {
   code: string;
@@ -41,7 +45,7 @@ export function UserCodeCard({ code, copied, onCopy }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -64,4 +68,4 @@ const styles = StyleSheet.create({
   hint: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   hintText: { ...type.small, color: colors.textMuted },
   copiedText: { color: colors.success },
-});
+}));

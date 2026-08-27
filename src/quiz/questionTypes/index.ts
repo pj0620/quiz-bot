@@ -34,4 +34,5 @@ export {
   isValidQuestion,
   listQuestionFormats,
   summarizeQuestion,
+  transcribeAnswer,
 } from './registry';

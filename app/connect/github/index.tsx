@@ -1,6 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Redirect, useRouter } from 'expo-router';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import {
+  useCallback,
+  useEffect,
+  useState } from 'react';
+import { Redirect,
+  useRouter } from 'expo-router';
+import { ActivityIndicator,
+  Text,
+  View,
+} from 'react-native';
 
 import { useDeviceFlow } from '../../../src/features/github/auth/useDeviceFlow';
 import { getAuthSnapshot } from '../../../src/features/github/auth/tokenManager';
@@ -10,7 +17,7 @@ import { formatCountdown, nowMs } from '../../../src/lib/time';
 import { Button } from '../../../src/ui/components/Button';
 import { Callout } from '../../../src/ui/components/Callout';
 import { Screen } from '../../../src/ui/components/Screen';
-import { colors, spacing, type } from '../../../src/ui/theme';
+import { colors, spacing, themedSheet, type } from '../../../src/ui/theme';
 
 export default function ConnectGitHubScreen() {
   const router = useRouter();
@@ -142,10 +149,10 @@ export default function ConnectGitHubScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   heading: { ...type.heading, color: colors.text },
   body: { ...type.body, color: colors.textMuted, lineHeight: 22 },
   centered: { alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingVertical: spacing.xxl },
   waitingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, justifyContent: 'center' },
   waiting: { ...type.small, color: colors.textMuted },
-});
+}));

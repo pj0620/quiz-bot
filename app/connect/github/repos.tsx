@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState } from 'react';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
 import { requireGitHubConfig } from '../../../src/config/env';
@@ -20,7 +24,7 @@ import { TextField } from '../../../src/ui/components/TextField';
 import { Callout } from '../../../src/ui/components/Callout';
 import { ErrorBanner } from '../../../src/ui/components/ErrorBanner';
 import { Screen } from '../../../src/ui/components/Screen';
-import { colors, radius, spacing, type } from '../../../src/ui/theme';
+import { colors, radius, spacing, themedSheet, type } from '../../../src/ui/theme';
 
 type Group = {
   installation: Installation;
@@ -213,7 +217,7 @@ export default function PickReposScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   group: { gap: spacing.sm },
   groupHeader: {
     flexDirection: 'row',
@@ -224,4 +228,4 @@ const styles = StyleSheet.create({
   groupTitle: { ...type.bodyStrong, color: colors.text },
   groupMeta: { ...type.small, color: colors.textMuted },
   body: { ...type.body, color: colors.textMuted },
-});
+}));

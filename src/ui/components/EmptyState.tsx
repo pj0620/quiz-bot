@@ -1,8 +1,9 @@
 import type { ComponentProps } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import {
+  Ionicons } from '@expo/vector-icons';
+import { Text, View } from 'react-native';
 
-import { colors, spacing, type } from '../theme';
+import { colors, spacing, themedSheet, type } from '../theme';
 import { Button } from './Button';
 
 type Props = {
@@ -26,7 +27,7 @@ export function EmptyState({ icon, title, body, actionTitle, onAction }: Props) 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -36,5 +37,5 @@ const styles = StyleSheet.create({
   },
   title: { ...type.heading, color: colors.text, textAlign: 'center' },
   body: { ...type.body, color: colors.textMuted, textAlign: 'center', maxWidth: 320 },
-  action: { marginTop: spacing.sm, alignSelf: 'stretch', maxWidth: 320 },
-});
+  action: { marginTop: spacing.sm, alignSelf: 'center', width: '100%', maxWidth: 320 },
+}));

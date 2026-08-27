@@ -1,6 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { colors, radius, spacing, type } from '../theme';
+import { colors, radius, spacing, themedSheet, type } from '../theme';
 
 export type Segment = {
   label: string;
@@ -81,11 +81,11 @@ export function SegmentedBar({ segments, height = 10, showLegend = true }: Props
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedSheet(() => ({
   wrapper: { gap: spacing.sm },
   track: { flexDirection: 'row', overflow: 'hidden', backgroundColor: colors.surfaceAlt },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   dot: { width: 8, height: 8, borderRadius: 4 },
   legendLabel: { ...type.small, color: colors.textMuted },
-});
+}));
