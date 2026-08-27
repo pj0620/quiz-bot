@@ -37,6 +37,7 @@ function Swatch({ theme }: { theme: ThemeDefinition }) {
             styles.swatchText,
             { color: palette.text },
             theme.monospaced && styles.swatchMono,
+            !theme.monospaced && theme.fontFamily ? { fontFamily: theme.fontFamily } : null,
           ]}
           numberOfLines={1}
         >
@@ -93,8 +94,8 @@ export default function ThemeScreen() {
       <Stack.Screen options={{ title: 'Appearance' }} />
       <Screen>
         <Text style={styles.lead}>
-          Changes apply straight away, everywhere. Colours — and for Terminal, the typeface, the
-          glow and the screen itself.
+          Changes apply straight away, everywhere. Colours — and where a theme calls for it, the
+          typeface, the corners, the glow and the screen itself.
         </Text>
 
         {listThemes().map((theme) => {
