@@ -43,6 +43,12 @@
         "projectId": "eea08aa6-b27a-4f9c-8241-3f6c4ed2acf1"
       }
     },
-    "owner": "pj0620"
+    "owner": "pj0620",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/eea08aa6-b27a-4f9c-8241-3f6c4ed2acf1"
+    }
   }
 }

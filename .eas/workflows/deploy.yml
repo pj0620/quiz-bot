@@ -1,0 +1,60 @@
+name: Deploy to production
+
+# Fires on every push to main. A merge from the GitHub mobile app is therefore
+# the whole release trigger — see AGENTS.md for the remote-development setup.
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  test:
+    name: Typecheck and test
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+
+  # Hashes everything that affects the native runtime. Its output decides the
+  # branch below: unchanged native layer means the change can ship over the air.
+  fingerprint:
+    name: Fingerprint
+    needs: [test]
+    type: fingerprint
+
+  get_ios_build:
+    name: Check for existing build
+    needs: [fingerprint]
+    type: get-build
+    params:
+      fingerprint_hash: ${{ needs.fingerprint.outputs.ios_fingerprint_hash }}
+      profile: production
+
+  # No build matches this fingerprint -> the native layer changed -> rebuild.
+  build_ios:
+    name: Build iOS
+    needs: [get_ios_build]
+    if: ${{ !needs.get_ios_build.outputs.build_id }}
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  submit_ios:
+    name: Submit to TestFlight
+    needs: [build_ios]
+    type: submit
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+
+  # A build already matches this fingerprint -> JS-only change -> ship OTA.
+  publish_update:
+    name: Publish OTA update
+    needs: [get_ios_build]
+    if: ${{ needs.get_ios_build.outputs.build_id }}
+    type: update
+    params:
+      branch: production
+      platform: ios

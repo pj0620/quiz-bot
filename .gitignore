@@ -50,3 +50,6 @@ screenshots/
 # The GENERATED output in src/quiz/geography/data is committed; this is just
 # the upstream TopoJSON it was built from, re-fetchable on demand.
 scripts/.geocache/
+
+# Local Obsidian vault used as test data (nested git repo, not part of the app)
+notes-clone/
