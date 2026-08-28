@@ -302,6 +302,31 @@ describe('list recall', () => {
     expect(isGraded(grade) && grade.score).toBe(0);
   });
 
+  it('counts items the model matched that string matching could not', () => {
+    // "the number of people" names Population only to something that reads
+    // meaning; the judge's matches make up what the matcher missed.
+    const grade = gradeAnswer(
+      lr,
+      listRecallAnswer(['the number of people', 'Economic Strength', 'Professional Military'], {
+        matchedItems: [0],
+      }),
+    );
+    expect(isGraded(grade) && grade.outcome).toBe('correct');
+    expect(isGraded(grade) && grade.parts).toEqual({ '0': true, '1': true, '2': true });
+  });
+
+  it('never lets the judge take away a literal match', () => {
+    // The model can only add matches. An entry that literally matches the note
+    // stays claimed even when the verdict omits it.
+    const grade = gradeAnswer(lr, listRecallAnswer(['Population'], { matchedItems: [] }));
+    expect(isGraded(grade) && grade.parts).toEqual({ '0': true });
+  });
+
+  it('ignores out-of-range indexes in a judgement', () => {
+    const grade = gradeAnswer(lr, listRecallAnswer(['nonsense'], { matchedItems: [-1, 4, 99] }));
+    expect(isGraded(grade) && grade.score).toBe(0);
+  });
+
   it('lets a partial answer be submitted', () => {
     expect(isAnswerComplete(lr, listRecallAnswer(['', '', '']))).toBe(false);
     expect(isAnswerComplete(lr, listRecallAnswer(['Population', '', '']))).toBe(true);
