@@ -24,6 +24,7 @@ import { Chip, ChipGroup } from '../../src/ui/components/Chip';
 import { NoteSource } from '../../src/ui/components/NoteSource';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { MasteryDot } from '../../src/ui/components/MasteryDot';
+import { PronounceButton } from '../../src/ui/components/PronounceButton';
 import { QuestionFigureView } from '../../src/ui/components/QuestionFigureView';
 import { QuestionLocation } from '../../src/ui/components/QuestionLocation';
 import { Screen } from '../../src/ui/components/Screen';
@@ -143,9 +144,14 @@ export default function QuestionDetailScreen() {
           </Card>
         ) : isVocabQuestion(question) ? (
           <Card title="Vocabulary" tone="inset">
-            <Text style={styles.vocabWord} selectable>
-              {question.provenance.noteTitle}
-            </Text>
+            <View style={styles.vocabWordRow}>
+              <Text style={styles.vocabWord} selectable>
+                {question.provenance.noteTitle}
+              </Text>
+              {question.provenance.noteTitle ? (
+                <PronounceButton word={question.provenance.noteTitle} size={32} />
+              ) : null}
+            </View>
             {question.provenance.excerpt ? (
               <Text style={styles.vocabDefinition} selectable>
                 {question.provenance.excerpt}
@@ -222,7 +228,8 @@ const styles = themedSheet(() => ({
   metaRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   prompt: { ...type.heading, color: colors.text, lineHeight: 28 },
   path: { ...type.mono, color: colors.textMuted },
-  vocabWord: { ...type.heading, color: colors.text },
+  vocabWordRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  vocabWord: { ...type.heading, color: colors.text, flexShrink: 1 },
   vocabDefinition: { ...type.body, color: colors.textMuted, lineHeight: 24 },
   historyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   historyMeta: { ...type.small, color: colors.textMuted },
