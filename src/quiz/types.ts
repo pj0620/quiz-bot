@@ -263,7 +263,18 @@ export type ShortAnswerAnswer = {
   selfGrade?: SelfGrade;
   judged?: JudgedGrade;
 };
-export type ListRecallAnswer = { format: 'list-recall'; entries: string[] };
+/**
+ * Which items the model decided the entries named, as indexes into
+ * `ListRecallQuestion.items`. Stored on the answer for the same reason as
+ * `JudgedGrade`: it is the result of a network call.
+ */
+export type ListRecallJudgement = { matchedItems: number[] };
+
+export type ListRecallAnswer = {
+  format: 'list-recall';
+  entries: string[];
+  judged?: ListRecallJudgement;
+};
 export type FillBlankAnswer = { format: 'fill-blank'; values: Record<string, string> };
 /** Event ids in the order the reader currently has them arranged. */
 export type TimelineAnswer = { format: 'timeline'; order: string[] };

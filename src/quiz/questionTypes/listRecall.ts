@@ -40,6 +40,12 @@ export const listRecallLogic: QuestionTypeLogic<ListRecallQuestion> = {
    * Scored against `required`, not against the full list, so "name three of the
    * five" is graded on the three that were asked for. Each item can only be
    * claimed once, or typing the same answer three times would score full marks.
+   *
+   * When the model judged the entries (`answer.judged`, see `gradeListRecall`),
+   * its matches are ADDED to the string matcher's, never substituted for them.
+   * The model exists to catch what string matching cannot — "the USSR" naming
+   * "Soviet Union" — but an entry that literally matches the note must never
+   * be failed by a flaky verdict. The judge can only help, never punish.
    */
   grade(question, answer): Grade {
     const claimed = new Set<number>();
@@ -51,6 +57,14 @@ export const listRecallLogic: QuestionTypeLogic<ListRecallQuestion> = {
         (item, position) => !claimed.has(position) && entryMatchesItem(entry, item),
       );
       if (index >= 0) {
+        claimed.add(index);
+        parts[String(index)] = true;
+      }
+    }
+
+    if (answer.judged) {
+      for (const index of answer.judged.matchedItems) {
+        if (!Number.isInteger(index) || index < 0 || index >= question.items.length) continue;
         claimed.add(index);
         parts[String(index)] = true;
       }
@@ -96,6 +110,6 @@ export const listRecallLogic: QuestionTypeLogic<ListRecallQuestion> = {
   },
 };
 
-export function listRecallAnswer(entries: string[]): ListRecallAnswer {
-  return { format: 'list-recall', entries };
+export function listRecallAnswer(entries: string[], judged?: ListRecallAnswer['judged']): ListRecallAnswer {
+  return { format: 'list-recall', entries, judged };
 }

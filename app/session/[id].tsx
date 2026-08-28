@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { buildDiscussionSummary, vocabSubjectOf } from '../../src/quiz/discussionSummary';
 import { useVocabWordFor } from '../../src/quiz/vocab/useVocab';
 import { resolveCredentialsOrNull } from '../../src/features/llm/credentials';
+import { gradeListRecall } from '../../src/features/llm/gradeListRecall';
 import { gradeShortAnswer } from '../../src/features/llm/gradeShortAnswer';
 import { getAnswerView, getQuestionLogic, isAnswerComplete } from '../../src/quiz/questionTypes';
 import {
@@ -149,13 +150,14 @@ export default function SessionPlayerScreen() {
   );
 
   /*
-    A written answer is marked by the model before being committed.
+    A typed answer is marked by the model before being committed.
 
-    Everything else grades instantly and offline, so this is the one path that
-    waits on a network call. It is bounded three ways: only for short answer,
-    only when a judge is configured, and `gradeShortAnswer` resolves to null on
-    any failure instead of throwing — so the worst case is the self-grade
-    buttons that were there before, never a stuck quiz.
+    Everything else grades instantly and offline, so these are the only paths
+    that wait on a network call. Both are bounded the same three ways: only for
+    short answer and Name Them, only when a judge is configured, and the
+    grading call resolves to null on any failure instead of throwing — so the
+    worst case is what was there before: self-grade buttons for short answer,
+    the local string matcher for Name Them. Never a stuck quiz.
 
     Resolved as 'judge' rather than 'generate': marking can be pointed at its
     own provider and model in Settings, and asking for the generator here is
@@ -164,7 +166,9 @@ export default function SessionPlayerScreen() {
   const check = useCallback(async () => {
     if (!session || !question || !draft) return;
 
-    if (question.format !== 'short-answer' || draft.format !== 'short-answer') {
+    const isShortAnswer = question.format === 'short-answer' && draft.format === 'short-answer';
+    const isListRecall = question.format === 'list-recall' && draft.format === 'list-recall';
+    if (!isShortAnswer && !isListRecall) {
       commit(draft);
       return;
     }
@@ -172,16 +176,30 @@ export default function SessionPlayerScreen() {
     setChecking(true);
     try {
       const credentials = await resolveCredentialsOrNull('judge');
-      const verdict = credentials
-        ? await gradeShortAnswer({
-            question,
-            text: draft.text,
-            provider: credentials.provider,
-            apiKey: credentials.apiKey,
-            model: credentials.model,
-          })
-        : null;
-      commit(verdict ? { ...draft, judged: verdict } : draft);
+      if (!credentials) {
+        commit(draft);
+        return;
+      }
+
+      if (isShortAnswer) {
+        const verdict = await gradeShortAnswer({
+          question,
+          text: draft.text,
+          provider: credentials.provider,
+          apiKey: credentials.apiKey,
+          model: credentials.model,
+        });
+        commit(verdict ? { ...draft, judged: verdict } : draft);
+      } else if (isListRecall) {
+        const judged = await gradeListRecall({
+          question,
+          entries: draft.entries,
+          provider: credentials.provider,
+          apiKey: credentials.apiKey,
+          model: credentials.model,
+        });
+        commit(judged ? { ...draft, judged } : draft);
+      }
     } finally {
       setChecking(false);
     }
