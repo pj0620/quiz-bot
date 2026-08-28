@@ -53,6 +53,7 @@ import { HeaderIconButton } from '../../src/ui/components/HeaderIconButton';
 import { NoteSource } from '../../src/ui/components/NoteSource';
 import { ScreenScrollProvider, useScrollAnchor } from '../../src/ui/components/Screen';
 import { ProgressSegments, type SegmentState } from '../../src/ui/components/ProgressSegments';
+import { PronounceButton } from '../../src/ui/components/PronounceButton';
 import { QuestionFigureView } from '../../src/ui/components/QuestionFigureView';
 import { QuestionLocation } from '../../src/ui/components/QuestionLocation';
 import { TypewriterText } from '../../src/ui/components/TypewriterText';
@@ -421,6 +422,15 @@ export default function SessionPlayerScreen() {
     item?.answer?.format === 'short-answer' ? item.answer.judged : undefined;
   /** The word this question is about, for a vocabulary question. */
   const vocabSubject = vocabSubjectOf(question, vocabWord);
+  /*
+    Whether the question itself already shows the word. Every vocab format is
+    required to name its word EXCEPT fill-blank, where recovering the word is
+    the exercise — a labelled speaker button under one would hand the answer
+    over, and even an unlabelled one would say it out loud. Those get the
+    button at reveal, when the word is public anyway.
+  */
+  const promptNamesWord =
+    !!vocabSubject && question.prompt.toLowerCase().includes(vocabSubject.word.toLowerCase());
 
   return (
     /*
@@ -483,6 +493,17 @@ export default function SessionPlayerScreen() {
           */}
           <TypewriterText key={item.questionId} style={styles.prompt} text={question.prompt} selectable />
 
+          {/* The word with its sound, Google-panel style — part of knowing a
+              word is knowing how it sounds, and hearing it gives nothing away
+              that the prompt hasn't already shown. */}
+          {vocabSubject && (revealed || promptNamesWord) ? (
+            <View style={styles.pronounceRow}>
+              <PronounceButton word={vocabSubject.word} size={28} />
+              <Text style={styles.pronounceWord} selectable>
+                {vocabSubject.word}
+              </Text>
+            </View>
+          ) : null}
 
           {/* After the prompt: "Which state is this?" has to be read before the
               shape means anything. */}
@@ -690,6 +711,8 @@ const styles = themedSheet(() => ({
   },
   metaRow: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
   prompt: { ...type.heading, color: colors.text, lineHeight: 26 },
+  pronounceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, alignSelf: 'flex-start' },
+  pronounceWord: { ...type.bodyStrong, color: colors.textMuted, flexShrink: 1 },
   promptSource: { ...type.body, color: colors.text, lineHeight: 24 },
   actions: {
     paddingHorizontal: spacing.lg,

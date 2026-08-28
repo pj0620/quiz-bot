@@ -20,6 +20,7 @@ import { Callout } from '../../src/ui/components/Callout';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ListRow } from '../../src/ui/components/ListRow';
 import { MasteryDot } from '../../src/ui/components/MasteryDot';
+import { PronounceButton } from '../../src/ui/components/PronounceButton';
 import { RunNoteRow } from '../../src/ui/components/RunNoteRow';
 import { Screen } from '../../src/ui/components/Screen';
 import { SectionHeader } from '../../src/ui/components/SectionHeader';
@@ -86,9 +87,15 @@ export default function WordDetailScreen() {
           {questions.length === 0 ? <Badge label="No questions yet" tone="warning" /> : null}
         </View>
 
-        <Text style={styles.word} selectable>
-          {word.word}
-        </Text>
+        {/* The word with its sound beside it, the way Google's panel heads a
+            definition. The disc sits after the word: this screen is ABOUT the
+            word, and the button is its accessory. */}
+        <View style={styles.wordRow}>
+          <Text style={styles.word} selectable>
+            {word.word}
+          </Text>
+          <PronounceButton word={word.word} />
+        </View>
         {word.definition ? (
           <Text style={styles.definition} selectable>
             {word.definition}
@@ -161,7 +168,9 @@ export default function WordDetailScreen() {
 
 const styles = themedSheet(() => ({
   metaRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
-  word: { ...type.title, color: colors.text },
+  wordRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  // Shrinks so "esprit de corps" wraps rather than pushing the disc off-screen.
+  word: { ...type.title, color: colors.text, flexShrink: 1 },
   definition: { ...type.body, color: colors.textMuted, lineHeight: 24 },
   list: { gap: spacing.sm },
 }));
