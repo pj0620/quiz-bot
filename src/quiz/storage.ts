@@ -1,4 +1,12 @@
-import { createDebouncedRecordSaver, createDebouncedSaver, loadRecordSync, loadSync, type PersistConfig } from '../lib/persist';
+import {
+  createDebouncedRecordSaver,
+  createDebouncedSaver,
+  loadAsync,
+  loadRecordAsync,
+  loadRecordSyncChecked,
+  loadSyncChecked,
+  type PersistConfig,
+} from '../lib/persist';
 import { isValidQuestion } from './questionTypes/registry';
 import { isValidReviewState } from './srs/schedule';
 import type { Question, Quiz, ReviewState, Session } from './types';
@@ -90,10 +98,23 @@ export const sessionsConfig: PersistConfig<Session> = {
   isValid: isValidSession,
 };
 
-export const loadQuestionsSync = () => loadSync(questionsConfig);
-export const loadReviewSync = () => loadRecordSync(reviewConfig);
-export const loadQuizzesSync = () => loadSync(quizzesConfig);
-export const loadSessionsSync = () => loadSync(sessionsConfig);
+/*
+  Checked variants, so the stores can tell "nothing stored" apart from "the
+  read failed". The distinction is the whole statistics-loss bug: an app update
+  forces a cold launch, a cold launch is when the first synchronous read is
+  most likely to fail transiently, and a failed read reported as "empty" makes
+  every stat hydrate to zero — with the next write flattening the real history.
+*/
+export const loadQuestionsSync = () => loadSyncChecked(questionsConfig);
+export const loadReviewSync = () => loadRecordSyncChecked(reviewConfig);
+export const loadQuizzesSync = () => loadSyncChecked(quizzesConfig);
+export const loadSessionsSync = () => loadSyncChecked(sessionsConfig);
+
+/** Recovery reads — async, straight to storage, past the degraded flag. */
+export const loadQuestionsAsync = () => loadAsync(questionsConfig);
+export const loadReviewAsync = () => loadRecordAsync(reviewConfig);
+export const loadQuizzesAsync = () => loadAsync(quizzesConfig);
+export const loadSessionsAsync = () => loadAsync(sessionsConfig);
 
 export const questionsSaver = createDebouncedSaver(questionsConfig);
 export const reviewSaver = createDebouncedRecordSaver(reviewConfig);

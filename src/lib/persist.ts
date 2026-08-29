@@ -1,4 +1,4 @@
-import { readJsonSync, writeJson } from './kv';
+import { getItem, isStorageDegraded, readJsonSync, writeJson } from './kv';
 
 /**
  * Shared envelope persistence, factored out of sources/storage.ts so the four
@@ -32,6 +32,42 @@ export function parseEnvelope<T>(raw: unknown, config: PersistConfig<T>): T[] {
 /** Synchronous load, so stores hydrate on first render with no empty flash. */
 export function loadSync<T>(config: PersistConfig<T>): T[] {
   return parseEnvelope(readJsonSync<Envelope<T>>(config.key), config);
+}
+
+/**
+ * A hydration result that says whether the read FAILED, which is a different
+ * thing from "nothing stored". `failed` means the store came up empty because
+ * the read threw — the value may well still be on disk — so the owner should
+ * schedule an async recovery read rather than treat the emptiness as truth.
+ */
+export type HydrationResult<T> = { items: T[]; failed: boolean };
+
+export function loadSyncChecked<T>(config: PersistConfig<T>): HydrationResult<T> {
+  // `isStorageDegraded` reflects the most recent synchronous read, so it must
+  // be sampled immediately after this one — same technique as llm/settings.
+  const raw = readJsonSync<Envelope<T>>(config.key);
+  return { items: parseEnvelope(raw, config), failed: raw === null && isStorageDegraded() };
+}
+
+/**
+ * Async load for recovery reads. Goes straight to storage and never touches
+ * the degraded flag, so it cannot be fooled by other modules' reads succeeding
+ * in the meantime. Null means "nothing readable" — absent, still failing, or
+ * unparseable — as opposed to a readable envelope that filtered down to empty.
+ */
+export async function loadAsync<T>(config: PersistConfig<T>): Promise<T[] | null> {
+  const parsed = await readJsonAsync(config.key);
+  return parsed === null ? null : parseEnvelope(parsed, config);
+}
+
+async function readJsonAsync(key: string): Promise<unknown> {
+  const raw = await getItem(key);
+  if (raw === null) return null;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 export async function save<T>(items: T[], config: PersistConfig<T>): Promise<void> {
@@ -96,6 +132,20 @@ export function parseRecordEnvelope<T>(
 
 export function loadRecordSync<T>(config: PersistConfig<T>): Record<string, T> {
   return parseRecordEnvelope(readJsonSync<RecordEnvelope<T>>(config.key), config);
+}
+
+export type RecordHydrationResult<T> = { items: Record<string, T>; failed: boolean };
+
+export function loadRecordSyncChecked<T>(config: PersistConfig<T>): RecordHydrationResult<T> {
+  const raw = readJsonSync<RecordEnvelope<T>>(config.key);
+  return { items: parseRecordEnvelope(raw, config), failed: raw === null && isStorageDegraded() };
+}
+
+export async function loadRecordAsync<T>(
+  config: PersistConfig<T>,
+): Promise<Record<string, T> | null> {
+  const parsed = await readJsonAsync(config.key);
+  return parsed === null ? null : parseRecordEnvelope(parsed, config);
 }
 
 export async function saveRecord<T>(
