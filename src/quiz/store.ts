@@ -6,9 +6,13 @@ import { recordReview } from './srs/schedule';
 import {
   capBank,
   capSessions,
+  loadQuestionsAsync,
   loadQuestionsSync,
+  loadQuizzesAsync,
   loadQuizzesSync,
+  loadReviewAsync,
   loadReviewSync,
+  loadSessionsAsync,
   loadSessionsSync,
   questionsSaver,
   quizzesSaver,
@@ -34,7 +38,28 @@ import { isGraded } from './types';
  * `src/sources/store.ts`: module-level creation with synchronous hydration, a
  * private fire-and-forget persist, exported free functions as the only mutation
  * API, and non-hook getters for imperative callers.
+ *
+ * Hydration here is CHECKED: each load reports whether its read failed, and a
+ * failure schedules `recoverQuizStoresFromStorage` — the same defence
+ * `llm/settings.ts` grew when the reader's generation notes were being lost
+ * "on app updates". The stats screen is computed entirely from these stores,
+ * so without recovery the same cold-launch read failure wipes every statistic:
+ * the stores hydrate empty, and the first write persists that emptiness over
+ * the real history.
  */
+
+/*
+  What changed THIS session, per store. Recovery must never overwrite work the
+  user has done since launch — their answers are newer than anything on disk —
+  so an untouched store is restored wholesale, while a touched one is merged
+  with the in-memory copy winning on collision. Set by the persist helpers,
+  which every user-driven mutation goes through; built-in seeding deliberately
+  does not count (see `ensureBuiltinQuizzes`).
+*/
+let bankTouched = false;
+let reviewTouched = false;
+let quizzesTouched = false;
+let sessionsTouched = false;
 
 // ---------------------------------------------------------------------------
 // Question bank
@@ -42,9 +67,12 @@ import { isGraded } from './types';
 
 type BankState = { questions: Question[] };
 
-export const bankStore = createStore<BankState>({ questions: loadQuestionsSync() });
+const hydratedQuestions = loadQuestionsSync();
+
+export const bankStore = createStore<BankState>({ questions: hydratedQuestions.items });
 
 function persistBank(questions: Question[]): void {
+  bankTouched = true;
   questionsSaver.schedule(questions);
 }
 
@@ -159,7 +187,7 @@ export function deleteQuestions(questionIds: readonly string[]): { removed: numb
   }
   if (reviewsChanged) {
     reviewStore.set({ states });
-    reviewSaver.schedule(states);
+    persistReview(states);
   }
 
   /*
@@ -188,7 +216,7 @@ export function deleteQuestions(questionIds: readonly string[]): { removed: numb
   });
   if (sessionsChanged) {
     sessionsStore.set({ sessions });
-    sessionsSaver.schedule(sessions);
+    persistSessions(sessions);
   }
 
   return { removed };
@@ -225,14 +253,21 @@ export function removeQuestionsForSource(sourceId: string): void {
 export function clearQuestionBank(): { removed: number } {
   const removed = bankStore.get().questions.length;
 
+  // An explicit clear also calls off any pending hydration recovery for these
+  // stores: the user has declared the data gone, and a recovery read landing
+  // afterwards must not put it back.
+  pendingRecovery.questions = false;
+  pendingRecovery.review = false;
+  pendingRecovery.sessions = false;
+
   bankStore.set({ questions: [] });
   persistBank([]);
 
   reviewStore.set({ states: {} });
-  reviewSaver.schedule({});
+  persistReview({});
 
   sessionsStore.set({ sessions: [] });
-  sessionsSaver.schedule([]);
+  persistSessions([]);
 
   return { removed };
 }
@@ -251,14 +286,21 @@ export function getQuestionById(id: string): Question | undefined {
 
 type ReviewStoreState = { states: Record<string, ReviewState> };
 
-export const reviewStore = createStore<ReviewStoreState>({ states: loadReviewSync() });
+const hydratedReview = loadReviewSync();
+
+export const reviewStore = createStore<ReviewStoreState>({ states: hydratedReview.items });
+
+function persistReview(states: Record<string, ReviewState>): void {
+  reviewTouched = true;
+  reviewSaver.schedule(states);
+}
 
 export function applyReview(questionId: string, outcome: Outcome, now = Date.now()): ReviewState {
   const current = reviewStore.get().states;
   const next = recordReview(current[questionId], questionId, outcome, now);
   const states = { ...current, [questionId]: next };
   reviewStore.set({ states });
-  reviewSaver.schedule(states);
+  persistReview(states);
   return next;
 }
 
@@ -271,7 +313,7 @@ export function resetReview(questionId: string): void {
   if (!current[questionId]) return;
   const { [questionId]: _removed, ...states } = current;
   reviewStore.set({ states });
-  reviewSaver.schedule(states);
+  persistReview(states);
 }
 
 // ---------------------------------------------------------------------------
@@ -280,9 +322,12 @@ export function resetReview(questionId: string): void {
 
 type QuizzesState = { quizzes: Quiz[] };
 
-export const quizzesStore = createStore<QuizzesState>({ quizzes: loadQuizzesSync() });
+const hydratedQuizzes = loadQuizzesSync();
+
+export const quizzesStore = createStore<QuizzesState>({ quizzes: hydratedQuizzes.items });
 
 function persistQuizzes(quizzes: Quiz[]): void {
+  quizzesTouched = true;
   quizzesSaver.schedule(quizzes);
 }
 
@@ -325,7 +370,18 @@ export function ensureBuiltinQuizzes(now = Date.now()): void {
 
   const quizzes = [...missing, ...quizzesStore.get().quizzes];
   quizzesStore.set({ quizzes });
-  persistQuizzes(quizzes);
+
+  /*
+    Seed only in memory while recovery for this store is pending, and don't
+    mark the store as touched either way — this runs at every launch, not on a
+    user's say-so. When the quizzes read failed at hydration, the store looks
+    like a first run, so this reseeds the built-ins; persisting THAT would race
+    the recovery read and could replace the user's real quizzes (edits,
+    lastSessionAt, their own quizzes) with a fresh set of defaults. Recovery
+    re-runs this once the stored quizzes are back.
+  */
+  if (pendingRecovery.quizzes) return;
+  quizzesSaver.schedule(quizzes);
 }
 
 export const BUILTIN_QUIZZES: Quiz[] = [
@@ -384,9 +440,12 @@ export const BUILTIN_QUIZZES: Quiz[] = [
 
 type SessionsState = { sessions: Session[] };
 
-export const sessionsStore = createStore<SessionsState>({ sessions: loadSessionsSync() });
+const hydratedSessions = loadSessionsSync();
+
+export const sessionsStore = createStore<SessionsState>({ sessions: hydratedSessions.items });
 
 function persistSessions(sessions: Session[], immediate = false): void {
+  sessionsTouched = true;
   sessionsSaver.schedule(sessions);
   // A completed session is worth a synchronous write — losing the last answer
   // of a finished quiz to a background kill would be very visible.
@@ -618,4 +677,153 @@ export function getSessionById(id: string): Session | undefined {
 /** The resumable session the Stats tab surfaces, if any. */
 export function getActiveSession(): Session | undefined {
   return sessionsStore.get().sessions.find((session) => session.status === 'active');
+}
+
+// ---------------------------------------------------------------------------
+// Hydration recovery
+// ---------------------------------------------------------------------------
+
+/*
+  The "my statistics vanished after an app update" bug, and its fix — the same
+  one `llm/settings.ts` grew for the reader's generation notes.
+
+  An update forces a cold launch, a cold launch is when the very first
+  synchronous read is most likely to fail transiently, and a failed read used
+  to be indistinguishable from "nothing stored": the stores hydrated empty,
+  every stat computed from them showed zero, and the next write — answering a
+  single question was enough — persisted that emptiness over the real history.
+
+  So hydration now records WHICH reads failed, and this schedules an async
+  re-read for exactly those stores. Async reads go straight to storage and
+  bypass the degraded flag, so this cannot be fooled by other modules' reads
+  succeeding in the meantime.
+*/
+const pendingRecovery = {
+  questions: hydratedQuestions.failed,
+  review: hydratedReview.failed,
+  quizzes: hydratedQuizzes.failed,
+  sessions: hydratedSessions.failed,
+};
+
+function anyRecoveryPending(): boolean {
+  return (
+    pendingRecovery.questions ||
+    pendingRecovery.review ||
+    pendingRecovery.quizzes ||
+    pendingRecovery.sessions
+  );
+}
+
+/*
+  The apply helpers below share one rule: an untouched store is replaced
+  wholesale and NOT persisted (what came back is what storage already holds),
+  while a touched store is merged — in-memory wins on collision, because the
+  user's work this session is newer than anything on disk — and the merged
+  result is persisted, since it is now the only complete copy anywhere.
+*/
+
+function applyRecoveredQuestions(recovered: Question[]): void {
+  if (!bankTouched) {
+    bankStore.set({ questions: recovered });
+    return;
+  }
+  const current = bankStore.get().questions;
+  const seen = new Set(current.map((question) => question.id));
+  const questions = capBank(
+    [...current, ...recovered.filter((question) => !seen.has(question.id))],
+    reviewStore.get().states,
+  );
+  bankStore.set({ questions });
+  persistBank(questions);
+}
+
+function applyRecoveredReview(recovered: Record<string, ReviewState>): void {
+  if (!reviewTouched) {
+    reviewStore.set({ states: recovered });
+    return;
+  }
+  const states = { ...recovered, ...reviewStore.get().states };
+  reviewStore.set({ states });
+  persistReview(states);
+}
+
+function applyRecoveredQuizzes(recovered: Quiz[]): void {
+  if (!quizzesTouched) {
+    quizzesStore.set({ quizzes: recovered });
+    return;
+  }
+  const current = quizzesStore.get().quizzes;
+  const seen = new Set(current.map((quiz) => quiz.id));
+  const quizzes = [...current, ...recovered.filter((quiz) => !seen.has(quiz.id))];
+  quizzesStore.set({ quizzes });
+  persistQuizzes(quizzes);
+}
+
+function applyRecoveredSessions(recovered: Session[]): void {
+  if (!sessionsTouched) {
+    sessionsStore.set({ sessions: recovered });
+    return;
+  }
+  const current = sessionsStore.get().sessions;
+  const seen = new Set(current.map((session) => session.id));
+  const sessions = capSessions([
+    ...current,
+    ...recovered.filter((session) => !seen.has(session.id)),
+  ]);
+  sessionsStore.set({ sessions });
+  persistSessions(sessions);
+}
+
+/**
+ * Puts stored data back after a hydration read that FAILED (as opposed to one
+ * that found nothing stored). Retries on a backoff, since the usual cause —
+ * the database briefly unopenable at cold launch — clears itself within
+ * moments. Each store is restored the moment its own read answers; the loop
+ * keeps going for whichever are still pending. Returns whether anything was
+ * recovered.
+ */
+export async function recoverQuizStoresFromStorage(
+  delays: readonly number[] = [500, 2_000, 8_000],
+): Promise<boolean> {
+  let recovered = false;
+
+  for (let attempt = 0; ; attempt += 1) {
+    const [questions, review, quizzes, sessions] = await Promise.all([
+      pendingRecovery.questions ? loadQuestionsAsync() : Promise.resolve(null),
+      pendingRecovery.review ? loadReviewAsync() : Promise.resolve(null),
+      pendingRecovery.quizzes ? loadQuizzesAsync() : Promise.resolve(null),
+      pendingRecovery.sessions ? loadSessionsAsync() : Promise.resolve(null),
+    ]);
+
+    if (questions !== null) {
+      pendingRecovery.questions = false;
+      applyRecoveredQuestions(questions);
+      recovered = true;
+    }
+    if (review !== null) {
+      pendingRecovery.review = false;
+      applyRecoveredReview(review);
+      recovered = true;
+    }
+    if (quizzes !== null) {
+      pendingRecovery.quizzes = false;
+      applyRecoveredQuizzes(quizzes);
+      recovered = true;
+      // Seeding was suppressed while this store's recovery was pending; now
+      // that the real quizzes are back, fill in any genuinely missing built-ins.
+      ensureBuiltinQuizzes();
+    }
+    if (sessions !== null) {
+      pendingRecovery.sessions = false;
+      applyRecoveredSessions(sessions);
+      recovered = true;
+    }
+
+    if (!anyRecoveryPending() || attempt >= delays.length) return recovered;
+    await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+  }
+}
+
+if (anyRecoveryPending()) {
+  void recoverQuizStoresFromStorage().catch(() => undefined);
 }
