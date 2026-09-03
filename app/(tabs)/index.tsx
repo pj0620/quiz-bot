@@ -1,41 +1,31 @@
 import {
   useMemo } from 'react';
 import { useRouter } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Pressable, Text } from 'react-native';
 
-import { addDays } from '../../src/lib/day';
-import { formatTopic } from '../../src/quiz/topics';
-import { MASTERY_LABELS } from '../../src/quiz/srs/mastery';
-import { computeStats, overallMastery } from '../../src/quiz/stats';
+import { computeStats } from '../../src/quiz/stats';
 import {
   useActiveSession,
   useQuestions,
   useReviewStates,
   useSessions,
-  useTopicMastery,
+  useTopicSummaries,
 } from '../../src/quiz/useQuiz';
 import { useSources } from '../../src/sources/useSources';
-import { BarChart } from '../../src/ui/components/BarChart';
 import { Button } from '../../src/ui/components/Button';
 import { Callout } from '../../src/ui/components/Callout';
-import { Card } from '../../src/ui/components/Card';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ListRow } from '../../src/ui/components/ListRow';
-import { MasteryDot, MASTERY_COLORS } from '../../src/ui/components/MasteryDot';
-import { GradePill } from '../../src/ui/components/GradePill';
-import { ProgressBar } from '../../src/ui/components/ProgressBar';
 import { Screen } from '../../src/ui/components/Screen';
-import { ScoreDots } from '../../src/ui/components/ScoreDots';
 import { SectionHeader } from '../../src/ui/components/SectionHeader';
-import { SegmentedBar } from '../../src/ui/components/SegmentedBar';
 import { StatRow } from '../../src/ui/components/StatRow';
+import { ActivityCard, MasteryCard, ScoreCard } from '../../src/ui/components/StatsCards';
+import { TopicRow } from '../../src/ui/components/TopicRow';
 import { colors, spacing, themedSheet, type } from '../../src/ui/theme';
 
-const WEEKDAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-function weekdayLabel(now: number, dayOffset: number): string {
-  return WEEKDAY[new Date(addDays(now, dayOffset)).getDay()];
-}
+/** How many of the weakest topics the tab previews before handing over to "By topic". */
+const WEAKEST_SHOWN = 5;
 
 export default function StatsScreen() {
   const router = useRouter();
@@ -44,7 +34,6 @@ export default function StatsScreen() {
   const reviewStates = useReviewStates();
   const sessions = useSessions();
   const activeSession = useActiveSession();
-  const topics = useTopicMastery();
 
   const now = Date.now();
   const stats = useMemo(
@@ -52,7 +41,8 @@ export default function StatsScreen() {
     [questions, reviewStates, sessions, now],
   );
 
-  const mastered = useMemo(() => overallMastery(stats.mastery), [stats.mastery]);
+  // Weakest first — the order to act on. See `summarizeTopics`.
+  const topics = useTopicSummaries(now);
 
   if (sources.length === 0) {
     return (
@@ -116,93 +106,47 @@ export default function StatsScreen() {
         ]}
       />
 
-      <Card title="What you know" icon="school-outline" accent="violet">
-        <View style={styles.masteryHead}>
-          <Text style={styles.big}>{Math.round(mastered * 100)}%</Text>
-          <Text style={styles.hint}>
-            across {stats.bankTotal} question{stats.bankTotal === 1 ? '' : 's'}
-          </Text>
-        </View>
-        <ProgressBar value={mastered} height={8} />
-        <SegmentedBar
-          segments={stats.mastery.map((slice) => ({
-            label: MASTERY_LABELS[slice.level],
-            value: slice.count,
-            color: MASTERY_COLORS[slice.level],
-          }))}
-        />
-      </Card>
+      {/*
+        The whole-bank figure is the summary; the card itself is the way into
+        the same picture per topic. A drill-down rather than a filter on this
+        tab, because the tab is the landing screen and a filter left switched
+        on would make every number on it describe one topic while looking
+        like the whole.
+      */}
+      <MasteryCard
+        stats={stats}
+        titleAccessory={<Text style={styles.link}>By topic</Text>}
+        onPress={() => router.push('/stats/topics')}
+      />
 
-      <Card title="Reviews, last 14 days" icon="bar-chart-outline" accent="teal">
-        <BarChart
-          bars={stats.activity.map((day) => ({
-            value: day.reviewed,
-            label: weekdayLabel(now, day.dayOffset),
-            highlight: day.dayOffset === 0,
-          }))}
-          maxLabel={`peak ${Math.max(...stats.activity.map((day) => day.reviewed), 0)}`}
-          emptyMessage="No reviews in the last two weeks"
-        />
-        <Text style={styles.hint}>
-          {stats.reviewedToday > 0
-            ? `${stats.reviewedToday} answered today`
-            : 'Nothing answered today yet'}
-        </Text>
-      </Card>
+      <ActivityCard stats={stats} now={now} />
 
-      <Card title="How you scored" icon="ribbon-outline" accent="amber">
-        <ScoreDots
-          days={stats.week.map((day) => ({
-            label: weekdayLabel(now, day.dayOffset),
-            score: day.score,
-            grade: day.grade,
-            highlight: day.dayOffset === 0,
-          }))}
-        />
-        <Text style={styles.hint}>
-          Percent correct each day. Grey means you didn&rsquo;t study that day.
-        </Text>
-        {stats.dueNow > 0 ? (
-          <Text style={styles.hint}>{stats.dueNow} ready to review now</Text>
-        ) : null}
-      </Card>
+      <ScoreCard stats={stats} now={now} />
 
       {topics.length > 0 ? (
         <>
           <SectionHeader
             title="Weakest topics"
             accent="danger"
-            accessory={<Text style={styles.count}>{topics.length}</Text>}
+            accessory={
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/stats/topics')}
+                hitSlop={8}
+                style={({ pressed }) => [styles.seeAll, pressed && styles.pressed]}
+              >
+                <Text style={styles.link}>See all {topics.length}</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+              </Pressable>
+            }
           />
-          {topics.slice(0, 5).map((topic) => {
-            const scored = stats.topicScores[topic.topic];
-            return (
-              <ListRow
-                key={topic.topic}
-                title={formatTopic(topic.topic)}
-                /*
-                  Mastery and answer count, with the grade shown separately.
-                  They answer different questions — "how well does the schedule
-                  think you know this" versus "how well have you actually
-                  answered it" — and collapsing them would hide the case that
-                  matters: a topic graded A that is still mostly unseen.
-                */
-                subtitle={`${MASTERY_LABELS[topic.level]} · ${topic.total} question${topic.total === 1 ? '' : 's'}${
-                  scored ? ` · ${scored.correct}/${scored.answered} right` : ''
-                }`}
-                onPress={() => router.push({ pathname: '/questions', params: { topic: topic.topic } })}
-                accessory={
-                  <View style={styles.topicCell}>
-                    <GradePill grade={scored?.grade ?? null} score={scored?.score ?? null} />
-                    <View style={styles.masteryCell}>
-                      <ProgressBar value={topic.score} height={4} />
-                      <MasteryDot level={topic.level} size={7} />
-                    </View>
-                  </View>
-                }
-              />
-            );
-          })}
+          {topics.slice(0, WEAKEST_SHOWN).map((topic) => (
+            <TopicRow
+              key={topic.topic}
+              topic={topic}
+              onPress={() => router.push(`/stats/topics/${encodeURIComponent(topic.topic)}`)}
+            />
+          ))}
         </>
       ) : null}
 
@@ -254,11 +198,9 @@ export default function StatsScreen() {
 }
 
 const styles = themedSheet(() => ({
-  masteryHead: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
-  big: { ...type.title, color: colors.text },
   hint: { ...type.small, color: colors.textMuted, lineHeight: 18 },
-  count: { ...type.small, color: colors.textFaint },
-  topicCell: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  masteryCell: { width: 44, gap: spacing.xs, alignItems: 'center' },
+  link: { ...type.smallStrong, color: colors.primary },
+  seeAll: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  pressed: { opacity: 0.6 },
   score: { ...type.bodyStrong, color: colors.textMuted },
 }));

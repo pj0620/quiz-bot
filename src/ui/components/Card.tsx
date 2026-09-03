@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from 'react';
 import {
   Ionicons } from '@expo/vector-icons';
-import { Text, View, type ViewStyle } from 'react-native';
+import { Pressable, Text, View, type ViewStyle } from 'react-native';
 
 import { accents, colors, elevation, radius, spacing, themedSheet, type, type AccentName } from '../theme';
 
@@ -22,6 +22,14 @@ type Props = {
   footer?: ReactNode;
   /** 'inset' recedes into the page; 'raised' lifts off it. */
   tone?: 'default' | 'inset' | 'raised';
+  /**
+   * Makes the whole card a button and adds a chevron to its title row.
+   *
+   * For a card that is a summary of somewhere else — the Stats tab's mastery
+   * card, which opens the per-topic view. Only for cards whose content is not
+   * itself interactive: a press anywhere on the card is the press.
+   */
+  onPress?: () => void;
   style?: ViewStyle;
 };
 
@@ -40,19 +48,13 @@ export function Card({
   icon,
   footer,
   tone = 'default',
+  onPress,
   style,
 }: Props) {
   const tint = accent ? accents[accent] : null;
 
-  return (
-    <View
-      style={[
-        styles.card,
-        tone === 'inset' && styles.inset,
-        tone === 'raised' && styles.raised,
-        style,
-      ]}
-    >
+  const content = (
+    <>
       {title || titleAccessory ? (
         <View style={styles.header}>
           {icon ? (
@@ -62,11 +64,34 @@ export function Card({
           ) : null}
           {title ? <Text style={styles.title}>{title}</Text> : <View style={styles.spacer} />}
           {titleAccessory}
+          {onPress ? <Ionicons name="chevron-forward" size={16} color={colors.textFaint} /> : null}
         </View>
       ) : null}
       {children}
       {footer ? <View style={styles.footer}>{footer}</View> : null}
-    </View>
+    </>
+  );
+
+  const base = [
+    styles.card,
+    tone === 'inset' && styles.inset,
+    tone === 'raised' && styles.raised,
+  ];
+
+  if (!onPress) {
+    return <View style={[...base, style]}>{content}</View>;
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      // The same press treatment as `ListRow`: a fill change, not a fade, which
+      // on a dark surface mostly reads as "disabled".
+      style={({ pressed }) => [...base, pressed && styles.pressed, style]}
+    >
+      {content}
+    </Pressable>
   );
 }
 
@@ -89,6 +114,7 @@ const styles = themedSheet(() => ({
     elevation: 0,
   },
   raised: { backgroundColor: colors.surfaceRaised, borderColor: colors.borderStrong },
+  pressed: { backgroundColor: colors.surfaceActive, borderColor: colors.borderStrong },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   iconChip: {
     width: 26,

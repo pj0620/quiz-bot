@@ -110,6 +110,10 @@ export default function RootLayout() {
         */}
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
+        {/* Reached from the Stats tab's mastery card and its topic rows. */}
+        <Stack.Screen name="stats/topics/index" options={{ title: 'By topic' }} />
+        <Stack.Screen name="stats/topics/[topic]" options={{ title: 'Topic' }} />
+
         <Stack.Screen name="settings/index" options={{ title: 'Settings' }} />
         <Stack.Screen name="settings/theme" options={{ title: 'Appearance' }} />
         <Stack.Screen name="generate/index" options={{ title: 'Generate' }} />
