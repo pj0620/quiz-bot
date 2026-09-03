@@ -7,9 +7,9 @@ import { listGeographyQuestions } from './geography/catalog';
 import { useEnabledSubjects } from './geography/preferences';
 import { resolveSessionGeography } from './geography/resolve';
 import { bankStore, quizzesStore, reviewStore, sessionsStore } from './store';
-import { topicMastery, type TopicMastery } from './srs/mastery';
 import { describeAvailability } from './selection/select';
 import { topicVocabulary, type TopicCount } from './topics';
+import { summarizeTopics, type TopicSummary } from './topicStats';
 import type { Question, Quiz, QuizRule, ReviewState, Session } from './types';
 
 /**
@@ -155,13 +155,22 @@ export function useSelectableTopicVocabulary(): TopicCount[] {
   return useMemo(() => topicVocabulary(questions), [questions]);
 }
 
-export function useTopicMastery(): TopicMastery[] {
-  // Selectable rather than the bank: review states are kept for geography just
-  // as they are for anything else, and progress the reader has actually made
-  // should show up next to the rest of it.
+/**
+ * Every topic with its mastery, grade and due count, weakest first — what the
+ * Stats tab's topic rows and the "By topic" screen are built from.
+ *
+ * Selectable rather than the bank: review states are kept for geography and
+ * the calendar just as they are for anything else, and progress the reader has
+ * actually made should show up next to the rest of it.
+ */
+export function useTopicSummaries(now: number): TopicSummary[] {
   const questions = useSelectableQuestions();
   const states = useReviewStates();
-  return useMemo(() => topicMastery(questions, states), [questions, states]);
+  const sessions = useSessions();
+  return useMemo(
+    () => summarizeTopics({ questions, reviewStates: states, sessions, now }),
+    [questions, states, sessions, now],
+  );
 }
 
 /**
