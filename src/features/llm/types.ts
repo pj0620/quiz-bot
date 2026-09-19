@@ -74,6 +74,15 @@ export type CompletionInput = {
    */
   effort?: ReasoningEffort;
   signal?: AbortSignal;
+  /**
+   * How long to wait for the reply, in foreground milliseconds. Omitted means
+   * `COMPLETION_TIMEOUT_MS`, sized for writing a whole note's questions. A
+   * caller that would rather do without an answer than wait — marking, which
+   * has a self-grade fallback — passes something far shorter.
+   */
+  timeoutMs?: number;
+  /** Extra attempts after a dropped connection. Omitted means the HTTP default. */
+  retries?: number;
 };
 
 /**

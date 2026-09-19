@@ -249,11 +249,15 @@ export type SelfGrade = 'got-it' | 'close' | 'missed';
 export type MultipleChoiceAnswer = { format: 'multiple-choice'; choiceId: string };
 export type TrueFalseAnswer = { format: 'true-false'; value: boolean };
 /**
- * A verdict reached by the model rather than by the user.
+ * A verdict reached by the app rather than by the user: by the on-device
+ * matcher (`judgeShortAnswerLocally`) or, failing that, by the model.
  *
- * Stored on the answer, not computed at grade time, because it is the result of
- * a network call: recomputing it when the results screen re-renders would mean
- * paying again and could return a different answer.
+ * Stored on the answer, not computed at grade time, because it may be the
+ * result of a network call: recomputing it when the results screen re-renders
+ * would mean paying again and could return a different answer. Storing the
+ * local verdicts the same way keeps one path through grading and gives them
+ * the same "I got that wrong" override, which a lenient matcher needs as much
+ * as a model does.
  */
 export type JudgedGrade = { outcome: Outcome; reason?: string };
 

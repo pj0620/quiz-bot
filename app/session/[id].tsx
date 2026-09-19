@@ -24,6 +24,8 @@ import { resolveCredentialsOrNull } from '../../src/features/llm/credentials';
 import { gradeListRecall } from '../../src/features/llm/gradeListRecall';
 import { gradeShortAnswer } from '../../src/features/llm/gradeShortAnswer';
 import { getAnswerView, getQuestionLogic, isAnswerComplete } from '../../src/quiz/questionTypes';
+import { listRecallNeedsJudge } from '../../src/quiz/questionTypes/listRecall';
+import { judgeShortAnswerLocally } from '../../src/quiz/questionTypes/shortAnswer';
 import {
   advanceSession,
   answerSessionItem,
@@ -151,14 +153,27 @@ export default function SessionPlayerScreen() {
   );
 
   /*
-    A typed answer is marked by the model before being committed.
+    A typed answer is marked on the device first, and by the model only when
+    the device cannot tell.
 
     Everything else grades instantly and offline, so these are the only paths
-    that wait on a network call. Both are bounded the same three ways: only for
-    short answer and Name Them, only when a judge is configured, and the
-    grading call resolves to null on any failure instead of throwing — so the
-    worst case is what was there before: self-grade buttons for short answer,
-    the local string matcher for Name Them. Never a stuck quiz.
+    that can wait on a network call — and they wait only as a last resort:
+
+     1. Short answer is compared to the model answer here, ignoring case and
+        punctuation, then allowing a spelling slip, then reordered words
+        (`judgeShortAnswerLocally`). A hit is committed at once, with no
+        request made and no connection needed. Name Them likewise skips the
+        model when every entry already names an item, or enough do for full
+        marks (`listRecallNeedsJudge`).
+     2. Only a miss goes to the model, and only when a judge is configured.
+     3. The grading call resolves to null on any failure instead of throwing:
+        no key, no signal, a reply that doesn't parse, or a connection too
+        slow to answer inside `JUDGE_TIMEOUT_MS`. Slow is treated exactly like
+        offline — the request is abandoned, not waited out.
+
+    So the worst case is what was there before any of this: self-grade
+    buttons for short answer, the local string matcher for Name Them. Never a
+    stuck quiz, and never a spinner for an answer that plainly matched.
 
     Resolved as 'judge' rather than 'generate': marking can be pointed at its
     own provider and model in Settings, and asking for the generator here is
@@ -170,6 +185,17 @@ export default function SessionPlayerScreen() {
     const isShortAnswer = question.format === 'short-answer' && draft.format === 'short-answer';
     const isListRecall = question.format === 'list-recall' && draft.format === 'list-recall';
     if (!isShortAnswer && !isListRecall) {
+      commit(draft);
+      return;
+    }
+
+    if (isShortAnswer) {
+      const local = judgeShortAnswerLocally(question, draft.text);
+      if (local) {
+        commit({ ...draft, judged: local });
+        return;
+      }
+    } else if (isListRecall && !listRecallNeedsJudge(question, draft.entries)) {
       commit(draft);
       return;
     }

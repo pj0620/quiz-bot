@@ -1,4 +1,11 @@
-import { outcomeFromSelfGrade, type Grade, type ShortAnswerAnswer, type ShortAnswerQuestion } from '../types';
+import {
+  outcomeFromSelfGrade,
+  type Grade,
+  type JudgedGrade,
+  type ShortAnswerAnswer,
+  type ShortAnswerQuestion,
+} from '../types';
+import { matchAnswerLocally, type LocalMatch } from './answerMatch';
 import {
   bulleted,
   hasValidQuestionBase,
@@ -87,4 +94,37 @@ export const shortAnswerLogic: QuestionTypeLogic<ShortAnswerQuestion> = {
 
 export function shortAnswerAnswer(text: string, selfGrade?: ShortAnswerAnswer['selfGrade']): ShortAnswerAnswer {
   return { format: 'short-answer', text, selfGrade };
+}
+
+/**
+ * Marks a written answer on the device, or declines to.
+ *
+ * Runs BEFORE the model is asked, and is the reason most short answers never
+ * need it: the answer is checked against the model answer and every
+ * `acceptable` variant, ignoring case and punctuation, then allowing a
+ * spelling slip, then allowing reordered words — see `answerMatch.ts` for the
+ * three checks and the guards on them. None of this needs a connection, and
+ * all of it is done before the Check button has finished being pressed.
+ *
+ * Only ever returns "correct". Null is not "incorrect", it is "cannot tell":
+ * a paraphrase, a synonym, or a plainly wrong answer all look the same from
+ * here, and telling them apart is what the model — or failing that, the
+ * reader — is for.
+ */
+export function judgeShortAnswerLocally(question: ShortAnswerQuestion, text: string): JudgedGrade | null {
+  const match = matchAnswerLocally(text, [question.modelAnswer, ...(question.acceptable ?? [])]);
+  if (!match) return null;
+  return { outcome: 'correct', reason: localReason(match) };
+}
+
+/** Shown above the explanation, in the place the model's reason would go. */
+function localReason(match: LocalMatch): string {
+  switch (match.via) {
+    case 'exact':
+      return 'That matches the answer.';
+    case 'fuzzy':
+      return 'That matches the answer, spelling aside.';
+    case 'similar':
+      return 'That matches the answer, wording aside.';
+  }
 }

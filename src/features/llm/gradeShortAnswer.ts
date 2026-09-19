@@ -1,5 +1,5 @@
 import type { Outcome, ShortAnswerQuestion } from '../../quiz/types';
-import type { LlmProviderDefinition } from './contract';
+import { JUDGE_TIMEOUT_MS, type LlmProviderDefinition } from './contract';
 
 /**
  * Marking a written answer with the model.
@@ -14,10 +14,17 @@ import type { LlmProviderDefinition } from './contract';
  * wording would teach them to memorise phrasing instead of the material. So the
  * instruction is to judge the knowledge shown, not the string.
  *
+ * The model is the last resort, not the first. Before anything is sent, the
+ * answer is compared to the model answer on the device — see
+ * `judgeShortAnswerLocally` and `answerMatch.ts` — and only an answer that
+ * none of those checks can vouch for reaches here. So "bull" for "Bull" never
+ * costs a request, and never depends on having a signal.
+ *
  * Grading must never block progress. Every failure path — no key, offline, a
- * reply that doesn't parse — returns null so the caller falls back to
- * self-grading. Being unable to reach an API is not a reason to lose someone's
- * place in a quiz.
+ * reply that doesn't parse, a connection too slow to answer inside
+ * `JUDGE_TIMEOUT_MS` — returns null so the caller falls back to self-grading.
+ * Being unable to reach an API is not a reason to lose someone's place in a
+ * quiz, and neither is a slow one.
  */
 
 export type Verdict = {
@@ -149,6 +156,9 @@ export async function gradeShortAnswer(input: GradeShortAnswerInput): Promise<Ve
       user: buildGradeUserPrompt(question, text),
       maxTokens: MAX_TOKENS,
       json: true,
+      // A slow connection is given up on, not waited out: see JUDGE_TIMEOUT_MS.
+      timeoutMs: JUDGE_TIMEOUT_MS,
+      retries: 0,
       signal,
     });
     return parseVerdict(completion.text);
