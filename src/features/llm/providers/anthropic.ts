@@ -91,7 +91,8 @@ async function complete(input: CompletionInput): Promise<CompletionResult> {
       method: 'POST',
       headers: spec.headers,
       body: spec.body,
-      timeoutMs: COMPLETION_TIMEOUT_MS,
+      timeoutMs: input.timeoutMs ?? COMPLETION_TIMEOUT_MS,
+      retries: input.retries,
       signal: input.signal,
     });
     return parseResponse(data);

@@ -33,6 +33,24 @@ type IoniconName = ComponentProps<typeof Ionicons>['name'];
 export const COMPLETION_TIMEOUT_MS = 300_000;
 
 /**
+ * How long marking one written answer may take before the app stops waiting.
+ *
+ * Eight seconds, against five minutes for generation, because the two waits
+ * are not alike. Generation has nothing to fall back on; marking does — the
+ * reader can mark their own answer, which is what the app did before a model
+ * was involved at all. So a slow connection is treated exactly like no
+ * connection: the request is abandoned and the self-grade buttons appear.
+ * Eight seconds is several times what a cheap model takes to compare one
+ * sentence against another on a working connection, and about as long as
+ * someone will watch a spinner mid-quiz before it starts to feel stuck.
+ *
+ * Counted in foreground time like every other timeout (see `lib/http.ts`),
+ * and used WITHOUT the transport retries: a retry with its backoff would more
+ * than double the wait on precisely the connection this exists to give up on.
+ */
+export const JUDGE_TIMEOUT_MS = 8_000;
+
+/**
  * How hard the model thinks when WRITING questions.
  *
  * One notch below the reasoning models' own default of 'high' — deliberately.

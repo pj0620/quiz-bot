@@ -1,5 +1,5 @@
 import type { ListRecallJudgement, ListRecallQuestion } from '../../quiz/types';
-import type { LlmProviderDefinition } from './contract';
+import { JUDGE_TIMEOUT_MS, type LlmProviderDefinition } from './contract';
 
 /**
  * Marking a "Name them" answer with the model.
@@ -15,9 +15,14 @@ import type { LlmProviderDefinition } from './contract';
  * (`claimed / required`) in `listRecallLogic.grade`; the model only decides the
  * matching, never the score.
  *
+ * Called only when the local matcher has left something for the model to
+ * decide — see `listRecallNeedsJudge`. Entries that already match an item
+ * (exactly, by containment, or within a spelling slip) never cost a request.
+ *
  * Grading must never block progress. Every failure path — no key, offline, a
- * reply that doesn't parse — returns null so the caller falls back to the
- * local string matcher, which is exactly what graded these answers before.
+ * reply that doesn't parse, a connection too slow to answer inside
+ * `JUDGE_TIMEOUT_MS` — returns null so the caller falls back to the local
+ * string matcher, which is exactly what graded these answers before.
  */
 
 /** Kept small: the reply is a list of item numbers, nothing more. */
@@ -142,6 +147,9 @@ export async function gradeListRecall(input: GradeListRecallInput): Promise<List
       user: buildListRecallUserPrompt(question, entries),
       maxTokens: MAX_TOKENS,
       json: true,
+      // A slow connection is given up on, not waited out: see JUDGE_TIMEOUT_MS.
+      timeoutMs: JUDGE_TIMEOUT_MS,
+      retries: 0,
       signal,
     });
     return parseListRecallJudgement(completion.text, question.items.length);
