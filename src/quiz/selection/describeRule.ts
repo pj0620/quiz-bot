@@ -13,11 +13,23 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-export function describeRule(rule: QuizRule, sourceNames?: Record<string, string>): string {
+export function describeRule(
+  rule: QuizRule,
+  sourceNames?: Record<string, string>,
+  planNames?: Record<string, string>,
+): string {
   // Each part is cased correctly at the point it's built rather than the whole
   // string being capitalized at the end — that would turn a repo name like
   // "octocat/hello" into "Octocat/hello".
   const parts: string[] = [];
+
+  // First, because a plan is the most specific thing a rule can say: everything
+  // after it narrows a set the reader already recognises by name.
+  if (rule.planIds?.length) {
+    // Plan titles are the reader's own words, so they are never re-cased.
+    const names = rule.planIds.map((id) => planNames?.[id] ?? 'A quiz plan');
+    parts.push(names.length === 1 ? `Plan: ${names[0]}` : `${names.length} quiz plans`);
+  }
 
   if (rule.addedWithinDays !== undefined) {
     parts.push(rule.addedWithinDays === 1 ? 'Added today' : `Added in the last ${rule.addedWithinDays} days`);

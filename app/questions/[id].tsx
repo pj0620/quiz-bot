@@ -13,6 +13,8 @@ import { MASTERY_LABELS, masteryOf } from '../../src/quiz/srs/mastery';
 import { flagQuestion, resetReview, unflagQuestion } from '../../src/quiz/store';
 import { useQuestion, useReviewStates } from '../../src/quiz/useQuiz';
 import { isPromptQuestion } from '../../src/quiz/promptSource';
+import { usePlan } from '../../src/quiz/builder/useBuilder';
+import { planTitle } from '../../src/quiz/builder/types';
 import { isVocabQuestion, slugFromPath } from '../../src/quiz/vocab/types';
 import { geographyLocationOf } from '../../src/quiz/geography/catalog';
 import type { Grade } from '../../src/quiz/types';
@@ -38,6 +40,7 @@ export default function QuestionDetailScreen() {
   const question = useQuestion(id);
   const reviewStates = useReviewStates();
   const state = id ? reviewStates[id] : undefined;
+  const plan = usePlan(question?.planId);
 
   /**
    * A synthetic pre-revealed grade so the registry's AnswerView renders in
@@ -176,6 +179,22 @@ export default function QuestionDetailScreen() {
             </Text>
           </Card>
         )}
+
+        {/*
+          The recipe, alongside the source. A question that keeps coming out
+          wrong is often the plan's doing rather than the note's, and this is
+          the way back to the place where that can be fixed.
+        */}
+        {plan ? (
+          <Card title="From a quiz plan" tone="inset" icon="construct-outline" accent="violet">
+            <Text style={styles.vocabDefinition}>{planTitle(plan)}</Text>
+            <Button
+              title="Open the plan"
+              variant="plain"
+              onPress={() => router.push(`/builder/${encodeURIComponent(plan.id)}`)}
+            />
+          </Card>
+        ) : null}
 
         <Card title="Review history" tone="inset">
           <View style={styles.historyRow}>

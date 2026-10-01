@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 // don't want an unstable API on the app's primary navigation.
 import { Tabs } from 'expo-router/js-tabs';
 
+import { useAttentionCount } from '../../src/quiz/builder/useBuilder';
 import { runStore } from '../../src/quiz/generation/runStore';
 import { colors } from '../../src/ui/theme';
 
@@ -25,6 +26,14 @@ export default function TabsLayout() {
     ).length;
     return left > 0 ? left : undefined;
   });
+
+  /*
+    Quiz plans waiting on the reader — a batch to review, or new notes to
+    write questions for. The same reasoning as the Library badge: a batch
+    finishes while the reader is somewhere else, and nothing else on any tab
+    would say so.
+  */
+  const attention = useAttentionCount();
 
   return (
     <Tabs
@@ -51,6 +60,20 @@ export default function TabsLayout() {
         options={{
           title: 'Quizzes',
           tabBarIcon: ({ color, size }) => <Ionicons name="albums-outline" size={size} color={color} />,
+        }}
+      />
+      {/*
+        Between Quizzes and Library because it is the bridge between them: it
+        builds quizzes out of library material.
+      */}
+      <Tabs.Screen
+        name="build"
+        options={{
+          title: 'Build',
+          tabBarIcon: ({ color, size }) => <Ionicons name="construct-outline" size={size} color={color} />,
+          tabBarBadge: attention > 0 ? attention : undefined,
+          // The one pairing every palette guarantees is readable — see `primaryText`.
+          tabBarBadgeStyle: { backgroundColor: colors.primary, color: colors.primaryText },
         }}
       />
       <Tabs.Screen

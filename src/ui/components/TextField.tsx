@@ -37,7 +37,7 @@ export const TextField = forwardRef<TextInput, Props>(function TextField(
         style={[
           styles.input,
           size === 'compact' && styles.compact,
-          multiline && styles.multiline,
+          multiline && (size === 'compact' ? styles.compactMultiline : styles.multiline),
           !!error && styles.errored,
         ]}
         {...props}
@@ -62,6 +62,12 @@ const styles = themedSheet(() => ({
   },
   compact: { minHeight: 36, paddingHorizontal: spacing.sm, ...type.small },
   multiline: { minHeight: 96, paddingTop: spacing.md, textAlignVertical: 'top' },
+  /*
+    A message composer: one line to start, growing with what is typed, capped
+    so a long message scrolls inside the field instead of pushing the
+    conversation off a screen the keyboard has already halved.
+  */
+  compactMultiline: { minHeight: 40, maxHeight: 120, paddingTop: spacing.sm, textAlignVertical: 'top' },
   errored: { borderColor: colors.danger },
   error: { ...type.small, color: colors.danger },
 }));

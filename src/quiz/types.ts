@@ -108,6 +108,17 @@ export type QuestionBase = {
    * only geography sets it. See `QuestionFigure`.
    */
   figure?: QuestionFigure;
+  /**
+   * The quiz plan that wrote this question, when one did. See
+   * `src/quiz/builder/types.ts`.
+   *
+   * A plain tag rather than ownership, unlike `sourceId`: deleting a plan can
+   * leave its questions in the bank, and nothing about answering or scheduling
+   * a question depends on where its recipe came from. What it buys is the
+   * ability to ask "which questions did this plan make?" — the bank filter and
+   * `QuizRule.planIds` both read it.
+   */
+  planId?: string;
 };
 
 export type Choice = { id: string; text: string };
@@ -372,6 +383,12 @@ export type QuizRule = {
   topics?: string[];
   /** Restrict to specific sources. Empty/absent = all sources. */
   sourceIds?: string[];
+  /**
+   * Restrict to questions written by these quiz plans. Empty/absent = no
+   * constraint. This is what a plan's own quiz is: a rule over the bank like
+   * any other, so newly accepted batches join it with no bookkeeping.
+   */
+  planIds?: string[];
   /** Only questions added within this many calendar days. */
   addedWithinDays?: number;
   formats?: QuestionFormat[];

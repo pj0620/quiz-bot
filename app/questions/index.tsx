@@ -9,8 +9,10 @@ import {
   BANK_SORTS,
   countActiveFilters,
   emptyBankFilter,
+  NO_PLAN,
   type BankFilter,
 } from '../../src/quiz/bankFilter';
+import { usePlanNames } from '../../src/quiz/builder/useBuilder';
 import { listQuestionFormats, summarizeQuestion } from '../../src/quiz/questionTypes';
 import { formatTopic } from '../../src/quiz/topics';
 import { MASTERY_LABELS, masteryOf } from '../../src/quiz/srs/mastery';
@@ -49,6 +51,33 @@ function toggled<T>(values: readonly T[], value: T): T[] {
   return values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value];
 }
 
+/** What a plan chip says. A tag outliving its plan still gets a readable label. */
+function planLabel(planId: string, names: Readonly<Record<string, string>>): string {
+  if (planId === NO_PLAN) return 'Not from a plan';
+  return names[planId] ?? 'A deleted plan';
+}
+
+/**
+ * Every plan with questions in the bank, biggest first, and how many have no
+ * plan at all. Empty when no question came from a plan — the section would
+ * offer one chip that matches everything.
+ */
+function usePlanCounts(questions: readonly Question[]): { planId: string; count: number }[] {
+  return useMemo(() => {
+    const counts = new Map<string, number>();
+    let none = 0;
+    for (const question of questions) {
+      if (question.planId) counts.set(question.planId, (counts.get(question.planId) ?? 0) + 1);
+      else none += 1;
+    }
+    if (counts.size === 0) return [];
+    const plans = Array.from(counts, ([planId, count]) => ({ planId, count })).sort(
+      (a, b) => b.count - a.count || a.planId.localeCompare(b.planId),
+    );
+    return none > 0 ? [...plans, { planId: NO_PLAN, count: none }] : plans;
+  }, [questions]);
+}
+
 /**
  * The filter sheet: every dimension in one place, applied live.
  *
@@ -74,6 +103,8 @@ function FilterSheet({
   const insets = useSafeAreaInsets();
   const vocabulary = useTopicVocabulary();
   const active = countActiveFilters(filter);
+  const planNames = usePlanNames();
+  const planCounts = usePlanCounts(useQuestions());
 
   return (
     <Modal
@@ -122,6 +153,28 @@ function FilterSheet({
               />
             ))}
           </ChipGroup>
+
+          {/*
+            Before topics: a plan is the reader's own name for a set of
+            questions, and "show me what this plan made" is the most common
+            reason to come looking — so it is the first narrowing on offer.
+          */}
+          {planCounts.length > 0 ? (
+            <>
+              <Text style={styles.sheetLabel}>Quiz plans</Text>
+              <ChipGroup>
+                {planCounts.map(({ planId, count }) => (
+                  <Chip
+                    key={planId}
+                    label={planLabel(planId, planNames)}
+                    count={count}
+                    selected={filter.planIds.includes(planId)}
+                    onPress={() => onChange({ ...filter, planIds: toggled(filter.planIds, planId) })}
+                  />
+                ))}
+              </ChipGroup>
+            </>
+          ) : null}
 
           {vocabulary.length > 0 ? (
             <>
@@ -215,14 +268,17 @@ function FilterSheet({
 export default function QuestionBankScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ topic?: string }>();
+  const params = useLocalSearchParams<{ topic?: string; plan?: string }>();
   const questions = useQuestions();
   const reviewStates = useReviewStates();
+  const planNames = usePlanNames();
 
-  // Seeded from the deep link, so Today's topic rows land pre-filtered.
+  // Seeded from the deep link, so Today's topic rows — and a plan's "see its
+  // questions" — land pre-filtered.
   const [filter, setFilter] = useState<BankFilter>(() => ({
     ...emptyBankFilter(),
     topics: typeof params.topic === 'string' ? [params.topic] : [],
+    planIds: typeof params.plan === 'string' ? [params.plan] : [],
   }));
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -259,6 +315,13 @@ export default function QuestionBankScreen() {
    */
   const activeChips = useMemo(() => {
     const chips: { key: string; label: string; remove: (current: BankFilter) => BankFilter }[] = [];
+    for (const planId of filter.planIds) {
+      chips.push({
+        key: `plan:${planId}`,
+        label: planLabel(planId, planNames),
+        remove: (current) => ({ ...current, planIds: current.planIds.filter((p) => p !== planId) }),
+      });
+    }
     for (const topic of filter.topics) {
       chips.push({
         key: `topic:${topic}`,
@@ -307,7 +370,7 @@ export default function QuestionBankScreen() {
       });
     }
     return chips;
-  }, [filter]);
+  }, [filter, planNames]);
 
   const toggle = useCallback((id: string) => {
     setSelected((previous) => {

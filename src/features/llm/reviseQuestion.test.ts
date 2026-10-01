@@ -138,6 +138,39 @@ describe('what a revision may and may not change', () => {
     });
   });
 
+  /*
+    The plan tag is what puts a question in its plan's quiz and under its plan
+    in the bank filter. Losing it on a revision would quietly move an edited
+    question out of the very quiz the reader was improving.
+  */
+  it('keeps the quiz plan a question belongs to', async () => {
+    const { promise } = revise(
+      { ...MULTIPLE_CHOICE, planId: 'plan-1' },
+      reply({
+        format: 'multiple-choice',
+        prompt: 'A reworded question',
+        explanation: 'Still because of patronage.',
+        choices: ['a', 'b'],
+        correctIndex: 0,
+      }),
+    );
+    expect((await promise).question.planId).toBe('plan-1');
+  });
+
+  it('adds no plan to a question that had none', async () => {
+    const { promise } = revise(
+      MULTIPLE_CHOICE,
+      reply({
+        format: 'multiple-choice',
+        prompt: 'A reworded question',
+        explanation: 'Still because of patronage.',
+        choices: ['a', 'b'],
+        correctIndex: 0,
+      }),
+    );
+    expect('planId' in (await promise).question).toBe(false);
+  });
+
   it('keeps provenance and the original dates', async () => {
     // A rewording doesn't change where the question came from, and bumping the
     // dates would make an edited question look newly generated to the Daily quiz.

@@ -4,6 +4,7 @@ import {
   emptyBankFilter,
   matchesBankFilter,
   sortQuestions,
+  NO_PLAN,
   type BankFilter,
 } from './bankFilter';
 import type { MultipleChoiceQuestion, Question, ReviewState } from './types';
@@ -108,6 +109,39 @@ describe('matchesBankFilter', () => {
     expect(matchesBankFilter(q, filter({ search: 'whig' }), undefined, NOW)).toBe(true);
     expect(matchesBankFilter(q, filter({ search: '  WHIG ' }), undefined, NOW)).toBe(true);
     expect(matchesBankFilter(q, filter({ search: 'tory' }), undefined, NOW)).toBe(false);
+  });
+});
+
+describe('matchesBankFilter — quiz plans', () => {
+  const fromPlan = question({ id: 'q1', planId: 'plan-a' });
+  const fromOther = question({ id: 'q2', planId: 'plan-b' });
+  const fromNone = question({ id: 'q3' });
+
+  it('shows only the questions a chosen plan wrote', () => {
+    const chosen = filter({ planIds: ['plan-a'] });
+    expect([fromPlan, fromOther, fromNone].filter((entry) => matchesBankFilter(entry, chosen, undefined, NOW))).toEqual([
+      fromPlan,
+    ]);
+  });
+
+  /*
+    "Not from a plan" is an ordinary choice in the same any-of list, which is
+    what lets the reader hide every plan's questions — or keep one plan and
+    everything else — without a second, inverted kind of filter.
+  */
+  it('treats "not from a plan" as one more choice in the same list', () => {
+    const none = filter({ planIds: [NO_PLAN] });
+    expect(matchesBankFilter(fromNone, none, undefined, NOW)).toBe(true);
+    expect(matchesBankFilter(fromPlan, none, undefined, NOW)).toBe(false);
+
+    const planOrNone = filter({ planIds: ['plan-a', NO_PLAN] });
+    expect(matchesBankFilter(fromPlan, planOrNone, undefined, NOW)).toBe(true);
+    expect(matchesBankFilter(fromNone, planOrNone, undefined, NOW)).toBe(true);
+    expect(matchesBankFilter(fromOther, planOrNone, undefined, NOW)).toBe(false);
+  });
+
+  it('counts each chosen plan in the badge', () => {
+    expect(countActiveFilters(filter({ planIds: ['plan-a', NO_PLAN] }))).toBe(2);
   });
 });
 
