@@ -40,6 +40,14 @@ describe('describeRule', () => {
   it('describes the weak-spots rule', () => {
     expect(describeRule(rule({ maxMastery: 'shaky' }))).toBe('Shaky or weaker');
   });
+
+  it('names a quiz plan first, in the reader’s own casing', () => {
+    expect(describeRule(rule({ planIds: ['p1'], mix: 'new-only' }), undefined, { p1: 'TFAS — big ideas' })).toBe(
+      'Plan: TFAS — big ideas · New only',
+    );
+    expect(describeRule(rule({ planIds: ['p1'] }))).toBe('Plan: A quiz plan');
+    expect(describeRule(rule({ planIds: ['p1', 'p2'] }))).toBe('2 quiz plans');
+  });
 });
 
 describe('describeMix', () => {

@@ -493,6 +493,50 @@ export function buildUserPrompt(
   filename: string,
   options: UserPromptOptions = {},
 ): string {
+  return `${buildNoteBlock(note, filename, options)}
+
+Decide for yourself how many questions this material is worth, and write that
+many. COVER IT FULLY — that is the goal, not a tidy number.
+
+Every distinct thing here WORTH REMEMBERING should be asked about at least once —
+which is not the same as every line. An example the note uses to carry an idea
+is not itself a thing to remember; the idea is. Cover what would still be worth
+knowing in five years, and let the packaging go.
+
+Then take the two or three ideas that matter MOST and ask each of them more than
+one way: what it is, why it happened, what followed from it, how it compares to
+the thing next to it. Meeting an important idea from a new angle is how it
+sticks, and it is wanted here. What is not wanted is the same question reworded —
+a second angle has to genuinely test something the first one did not.
+
+So a passing mention gets one question, a central idea gets three or four, and
+a thin note gets few questions while a dense one gets many. Do not pad with weak
+questions to reach a number, and do not stop while anything important is still
+untested.
+
+${maxQuestions} is a hard ceiling, not a target. Most notes should come in well
+under it; if you find yourself landing exactly on it, you are being cut off
+rather than finishing, so lead with the questions that matter most.
+
+Read the note in the context above: expand its shorthand, and treat the subjects
+it raises as the topic, not just the specific lines it happens to contain.`;
+}
+
+/**
+ * Everything a user prompt says about the NOTE — its filename, tags, links,
+ * the parts it was split into, what earlier parts asked, the delimited body —
+ * and nothing about how many questions to write.
+ *
+ * Split out of `buildUserPrompt` so a quiz plan can show a note exactly as
+ * note generation does and close with its own instruction. Everything that
+ * makes a note readable lives here, once; the closing is the only part a
+ * second caller has any business changing.
+ */
+export function buildNoteBlock(
+  note: ParsedNote,
+  filename: string,
+  options: UserPromptOptions = {},
+): string {
   const body = note.sections
     .map((section) => {
       const text = sectionText(section);
@@ -566,31 +610,5 @@ export function buildUserPrompt(
 
 --- the note, as written ---
 ${body}
---- end of note ---${caveat}
-
-Decide for yourself how many questions this material is worth, and write that
-many. COVER IT FULLY — that is the goal, not a tidy number.
-
-Every distinct thing here WORTH REMEMBERING should be asked about at least once —
-which is not the same as every line. An example the note uses to carry an idea
-is not itself a thing to remember; the idea is. Cover what would still be worth
-knowing in five years, and let the packaging go.
-
-Then take the two or three ideas that matter MOST and ask each of them more than
-one way: what it is, why it happened, what followed from it, how it compares to
-the thing next to it. Meeting an important idea from a new angle is how it
-sticks, and it is wanted here. What is not wanted is the same question reworded —
-a second angle has to genuinely test something the first one did not.
-
-So a passing mention gets one question, a central idea gets three or four, and
-a thin note gets few questions while a dense one gets many. Do not pad with weak
-questions to reach a number, and do not stop while anything important is still
-untested.
-
-${maxQuestions} is a hard ceiling, not a target. Most notes should come in well
-under it; if you find yourself landing exactly on it, you are being cut off
-rather than finishing, so lead with the questions that matter most.
-
-Read the note in the context above: expand its shorthand, and treat the subjects
-it raises as the topic, not just the specific lines it happens to contain.`;
+--- end of note ---${caveat}`;
 }

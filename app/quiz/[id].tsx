@@ -10,6 +10,7 @@ import { Alert,
 } from 'react-native';
 
 import { formatTopic } from '../../src/quiz/topics';
+import { usePlanNames } from '../../src/quiz/builder/useBuilder';
 import { describeDraw, describeMix, describeRule } from '../../src/quiz/selection/describeRule';
 import { describeAvailability } from '../../src/quiz/selection/select';
 import { useSelectionMode } from '../../src/quiz/preferences';
@@ -56,6 +57,7 @@ export default function QuizDetailScreen() {
     () => Object.fromEntries(getSources().map((source) => [source.id, source.fullName])),
     [],
   );
+  const planNames = usePlanNames();
 
   const selectionMode = useSelectionMode();
 
@@ -161,7 +163,7 @@ export default function QuizDetailScreen() {
         ) : null}
 
         <Card>
-          <Text style={styles.rule}>{describeRule(quiz.rule, sourceNames)}</Text>
+          <Text style={styles.rule}>{describeRule(quiz.rule, sourceNames, planNames)}</Text>
           {/* States the liveness up front, so changing question sets never surprises. */}
           <Text style={styles.draw}>{describeDraw(quiz.rule, availability.matching)}</Text>
 

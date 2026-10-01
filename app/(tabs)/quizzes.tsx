@@ -4,6 +4,7 @@ import { Tabs } from 'expo-router/js-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { View } from 'react-native';
 
+import { usePlanNames } from '../../src/quiz/builder/useBuilder';
 import { describeRule } from '../../src/quiz/selection/describeRule';
 import { describeAvailability } from '../../src/quiz/selection/select';
 import { useQuizzes, useReviewStates, useSelectableQuestions } from '../../src/quiz/useQuiz';
@@ -29,6 +30,8 @@ export default function QuizzesScreen() {
     () => Object.fromEntries(getSources().map((source) => [source.id, source.fullName])),
     [],
   );
+  // A plan's quiz reads "Plan: Thinking Fast and Slow" rather than a bare filter.
+  const planNames = usePlanNames();
 
   const renderQuiz = useCallback(
     (quiz: Quiz) => {
@@ -39,7 +42,7 @@ export default function QuizzesScreen() {
         <ListRow
           key={quiz.id}
           title={quiz.name}
-          subtitle={describeRule(quiz.rule, sourceNames)}
+          subtitle={describeRule(quiz.rule, sourceNames, planNames)}
           icon={quiz.icon as never}
           onPress={() => router.push(`/quiz/${encodeURIComponent(quiz.id)}`)}
           accessory={
@@ -52,7 +55,7 @@ export default function QuizzesScreen() {
         />
       );
     },
-    [questions, reviewStates, now, sourceNames, router],
+    [questions, reviewStates, now, sourceNames, planNames, router],
   );
 
   const builtins = quizzes.filter((quiz) => quiz.builtin);

@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { hydrateKeyStatus } from '../src/features/llm/settings';
 import { startAppStateTracking } from '../src/lib/appState';
+import { initPlanWatcher } from '../src/quiz/builder/watcher';
 import { initBackgroundResume } from '../src/quiz/generation/backgroundResume';
 import { ensureBuiltinQuizzes } from '../src/quiz/store';
 import { ensureBuiltinThemes } from '../src/quiz/vocab/preferences';
@@ -55,6 +56,13 @@ void hydrateKeyStatus();
   (`index.ts`). See `src/quiz/generation/backgroundResume.ts`.
 */
 initBackgroundResume();
+
+/*
+  Watches for notes that turn up after a quiz plan was agreed, and writes
+  questions for them — checked when the app comes to the foreground, never in
+  the background. See `src/quiz/builder/watcher.ts`.
+*/
+initPlanWatcher();
 
 /**
  * Anchors every route to the tabs.
@@ -122,6 +130,17 @@ export default function RootLayout() {
         <Stack.Screen name="sources/new" options={{ presentation: 'modal', title: 'Add a source' }} />
         <Stack.Screen name="sources/[id]" options={{ title: 'Source' }} />
         <Stack.Screen name="connect/github" options={{ headerShown: false }} />
+
+        {/*
+          Quiz plans. Plain stack screens throughout, never modals: a plan's
+          screens push onward to each other (overview → review → edit a
+          draft), and a modal has nowhere to push to.
+        */}
+        <Stack.Screen name="builder/[id]/index" options={{ title: 'Quiz plan' }} />
+        <Stack.Screen name="builder/[id]/chat" options={{ title: 'Plan with AI' }} />
+        <Stack.Screen name="builder/[id]/review/[batchId]" options={{ title: 'Review' }} />
+        <Stack.Screen name="builder/[id]/edit" options={{ title: 'Edit plan' }} />
+        <Stack.Screen name="builder/[id]/draft/[questionId]" options={{ title: 'Edit question' }} />
 
         <Stack.Screen name="quiz/[id]" options={{ title: 'Quiz' }} />
         <Stack.Screen name="quiz/new" options={{ presentation: 'modal', title: 'New quiz' }} />

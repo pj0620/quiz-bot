@@ -60,6 +60,7 @@ import {
 } from '../../src/quiz/generation/coverageStore';
 import { getAnswerView, getQuestionLogic } from '../../src/quiz/questionTypes';
 import { clearQuestionBank } from '../../src/quiz/store';
+import { resetAllPlanCoverage } from '../../src/quiz/builder/store';
 import {
   addTheme,
   removeTheme,
@@ -845,6 +846,8 @@ function QuestionBankCard() {
             const { removed } = clearQuestionBank();
             // Without this the ledger still says every note is covered.
             clearAllCoverage();
+            // And every quiz plan would say the same of its own notes.
+            resetAllPlanCoverage();
             Alert.alert(
               'Bank cleared',
               `${removed} question${removed === 1 ? '' : 's'} deleted. Generate again to rebuild it.`,

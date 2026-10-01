@@ -230,8 +230,15 @@ export async function reviseQuestion(input: ReviseQuestionInput): Promise<Revise
     // the new prompt, and keeping that would cost the user their whole review
     // history for this card. See the note at the top of this file.
     // Spread conditionally: writing `flagged: undefined` is not the same as
-    // omitting it under `exactOptionalPropertyTypes`.
-    question: { ...revised, id: question.id, ...(question.flagged ? { flagged: question.flagged } : {}) },
+    // omitting it under `exactOptionalPropertyTypes`. `planId` likewise is not
+    // the model's — a reworded question still belongs to the plan that wrote
+    // it, and dropping the tag would take it out of the plan's quiz.
+    question: {
+      ...revised,
+      id: question.id,
+      ...(question.flagged ? { flagged: question.flagged } : {}),
+      ...(question.planId ? { planId: question.planId } : {}),
+    },
     usage: completion.usage,
   };
 }

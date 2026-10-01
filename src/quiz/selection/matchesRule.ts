@@ -32,6 +32,12 @@ export function matchesRule(
 
   if (rule.sourceIds?.length && !rule.sourceIds.includes(question.sourceId)) return false;
 
+  // A question no plan wrote can never match a plan rule — `planId` absent is
+  // "not from a plan", not "from any plan".
+  if (rule.planIds?.length && (!question.planId || !rule.planIds.includes(question.planId))) {
+    return false;
+  }
+
   if (rule.formats?.length && !rule.formats.includes(question.format)) return false;
 
   if (rule.difficulties?.length && !rule.difficulties.includes(question.difficulty)) return false;

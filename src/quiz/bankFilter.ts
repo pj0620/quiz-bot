@@ -33,8 +33,17 @@ export type BankFilter = {
   /** Only questions added within the last N calendar days. */
   addedWithinDays?: number;
   flaggedOnly: boolean;
+  /**
+   * Questions written by ANY of these quiz plans. `NO_PLAN` stands for
+   * questions no plan wrote, so "this plan, or none" is one selection and
+   * "everything but plans" is another — both plain any-of, like the rest.
+   */
+  planIds: string[];
   sort: BankSort;
 };
+
+/** The plan filter's stand-in for "not from a plan". Real plan ids never look like this. */
+export const NO_PLAN = '__no-plan__';
 
 /** The windows the UI offers. Calendar days, matching `QuizRule.addedWithinDays`. */
 export const ADDED_WINDOWS: readonly { days: number; label: string }[] = [
@@ -58,6 +67,7 @@ export function emptyBankFilter(): BankFilter {
     difficulties: [],
     mastery: [],
     flaggedOnly: false,
+    planIds: [],
     // Newest first: the question you generated a minute ago is the one you
     // came to check on, and under insertion order it was at the very bottom.
     sort: 'newest',
@@ -75,6 +85,7 @@ export function countActiveFilters(filter: BankFilter): number {
     filter.formats.length +
     filter.difficulties.length +
     filter.mastery.length +
+    filter.planIds.length +
     (filter.addedWithinDays !== undefined ? 1 : 0) +
     (filter.flaggedOnly ? 1 : 0)
   );
@@ -94,6 +105,8 @@ export function matchesBankFilter(
   }
 
   if (filter.formats.length > 0 && !filter.formats.includes(question.format)) return false;
+
+  if (filter.planIds.length > 0 && !filter.planIds.includes(question.planId ?? NO_PLAN)) return false;
 
   if (filter.difficulties.length > 0 && !filter.difficulties.includes(question.difficulty)) {
     return false;

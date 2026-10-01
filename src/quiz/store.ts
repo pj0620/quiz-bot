@@ -237,6 +237,30 @@ export function removeQuestionsForSource(sourceId: string): void {
 }
 
 /**
+ * Strips a plan's tag from its questions, for a plan deleted with its
+ * questions kept.
+ *
+ * One pass rather than an `updateQuestion` per row, for the reason
+ * `deleteQuestions` gives. Leaving the tag behind would make the bank's plan
+ * filter offer a chip for a plan that no longer exists, and a plan's quiz rule
+ * keep matching questions it can no longer explain.
+ */
+export function detachQuestionsFromPlan(planId: string): number {
+  const state = bankStore.get();
+  let detached = 0;
+  const questions = state.questions.map((question) => {
+    if (question.planId !== planId) return question;
+    detached += 1;
+    const { planId: _planId, ...rest } = question;
+    return rest as Question;
+  });
+  if (detached === 0) return 0;
+  bankStore.set({ questions });
+  persistBank(questions);
+  return detached;
+}
+
+/**
  * Empties the bank and everything keyed to it.
  *
  * Deliberately one function rather than three, because a partial reset leaves

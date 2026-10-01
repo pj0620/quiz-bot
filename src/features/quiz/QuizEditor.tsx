@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
 
 import { hashString } from '../../lib/random';
+import { usePlanNames } from '../../quiz/builder/useBuilder';
 import { describeDraw } from '../../quiz/selection/describeRule';
 import { describeAvailability } from '../../quiz/selection/select';
 import { upsertQuiz } from '../../quiz/store';
@@ -46,7 +47,9 @@ export function QuizEditor({ existing }: Props) {
   const questions = useSelectableQuestions();
   const reviewStates = useReviewStates();
   const vocabulary = useSelectableTopicVocabulary();
+  const planNames = usePlanNames();
   const now = Date.now();
+  const planIds = existing?.rule.planIds ?? [];
 
   const [name, setName] = useState(existing?.name ?? '');
   const [topics, setTopics] = useState<string[]>(existing?.rule.topics ?? []);
@@ -62,6 +65,9 @@ export function QuizEditor({ existing }: Props) {
       addedWithinDays: windowDays > 0 ? windowDays : undefined,
       maxMastery: existing?.rule.maxMastery,
       sourceIds: existing?.rule.sourceIds,
+      // Not editable here, and dropping it would be far worse than invisible:
+      // a plan's quiz would silently widen to the whole bank on first save.
+      planIds: existing?.rule.planIds,
     }),
     [size, mix, topics, windowDays, existing],
   );
@@ -108,6 +114,21 @@ export function QuizEditor({ existing }: Props) {
         onChangeText={setName}
         autoCapitalize="words"
       />
+
+      {/*
+        Not editable here — the plan owns which questions belong to it — but
+        said out loud, so the match count below is never a mystery.
+      */}
+      {planIds.length > 0 ? (
+        <Callout
+          tone="info"
+          message={`Draws only on questions from ${
+            planIds.length === 1
+              ? `your quiz plan “${planNames[planIds[0]] ?? 'a deleted plan'}”`
+              : `${planIds.length} quiz plans`
+          }. Everything below narrows that further.`}
+        />
+      ) : null}
 
       <SectionHeader title="Topics" />
       {vocabulary.length === 0 ? (

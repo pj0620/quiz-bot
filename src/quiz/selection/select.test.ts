@@ -83,6 +83,18 @@ describe('matchesRule — filters', () => {
     expect(matchesRule(q('1'), rule({ difficulties: deep }), undefined, NOW)).toBe(false);
   });
 
+  /*
+    A plan's quiz is this rule. A question no plan wrote must never match it —
+    an absent `planId` means "from no plan", not "from any".
+  */
+  it('filters by quiz plan, never matching a question no plan wrote', () => {
+    const fromPlan = q('1', { planId: 'plan-a' });
+    expect(matchesRule(fromPlan, rule({ planIds: ['plan-a'] }), undefined, NOW)).toBe(true);
+    expect(matchesRule(fromPlan, rule({ planIds: ['plan-b'] }), undefined, NOW)).toBe(false);
+    expect(matchesRule(q('2'), rule({ planIds: ['plan-a'] }), undefined, NOW)).toBe(false);
+    expect(matchesRule(q('2'), rule({ planIds: [] }), undefined, NOW)).toBe(true);
+  });
+
   describe('addedWithinDays boundary', () => {
     it('includes something added today', () => {
       expect(matchesRule(q('1', { addedAt: NOW }), rule({ addedWithinDays: 2 }), undefined, NOW)).toBe(true);
