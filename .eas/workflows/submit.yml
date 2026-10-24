@@ -1,7 +1,7 @@
 name: Submit an existing build
 
 # deploy.yml cannot retry a failed submit. Once a build exists for the current
-# fingerprint, its get-build job finds that build, skips build_ios, and so skips
+# fingerprint, its get_ios_build job finds that build, skips build_ios, and so skips
 # submit_ios too — the run takes the OTA branch instead. This workflow is the
 # retry path: it submits a binary that has already been built.
 #

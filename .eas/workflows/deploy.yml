@@ -24,13 +24,29 @@ jobs:
     needs: [test]
     type: fingerprint
 
+  # Not the get-build job type: get-build skips builds whose artifact has
+  # expired (30 days), so a JS-only push a month after the last native build
+  # finds nothing and rebuilds an unchanged runtime. An OTA update only needs
+  # the runtime to have shipped once, so any finished build counts, expired or
+  # not. build_id stays unset when there is no match, as get-build left it.
   get_ios_build:
     name: Check for existing build
     needs: [fingerprint]
-    type: get-build
-    params:
-      fingerprint_hash: ${{ needs.fingerprint.outputs.ios_fingerprint_hash }}
-      profile: production
+    outputs:
+      build_id: ${{ steps.find.outputs.build_id }}
+    steps:
+      - uses: eas/checkout
+      # eas-cli resolves the app config's plugins, which needs node_modules.
+      - uses: eas/install_node_modules
+      - id: find
+        name: Find a build with this fingerprint
+        run: |
+          id=$(npx -y eas-cli@25.3.0 build:list --platform ios --build-profile production \
+            --status finished --fingerprint-hash ${{ needs.fingerprint.outputs.ios_fingerprint_hash }} \
+            --limit 1 --json --non-interactive \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)[0]?.id??""))')
+          echo "Matching build: ${id:-none}"
+          if [ -n "$id" ]; then set-output build_id "$id"; fi
 
   # No build matches this fingerprint -> the native layer changed -> rebuild.
   build_ios:

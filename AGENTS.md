@@ -35,9 +35,19 @@ Submission is configured non-interactively in `eas.json` (`ascAppId`,
 prompt that no worker can answer.
 
 `deploy.yml` cannot retry a failed submit: once a build exists for the current
-fingerprint, `get-build` finds it, `build_ios` is skipped, and `submit_ios` is
-skipped along with it. Use `submit.yml` with a build ID to submit a binary that
+fingerprint, `get_ios_build` finds it, `build_ios` is skipped, and `submit_ios`
+is skipped along with it. Use `submit.yml` with a build ID to submit a binary that
 already exists.
+
+`get_ios_build` is a custom job, not the `get-build` job type, because
+`get-build` ignores builds whose artifact has expired (30 days). With it, the
+first JS-only push a month after a native build rebuilt and resubmitted an
+unchanged runtime.
+
+If a submit fails in altool with `Cannot determine the Apple ID from Bundle ID`
+and nothing in `eas.json` or the credentials changed, the cause is on Apple's
+side. Check App Store Connect for an agreement awaiting acceptance, then retry
+with `submit.yml`. On 2026-10-01 this cleared without any change here.
 
 # Dependencies
 
