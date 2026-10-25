@@ -10,7 +10,7 @@ import type {
   SourceWriteResult,
 } from '../../sources/types';
 import { getFileRaw } from './api/contents';
-import { createBlob, createCommit, createTree, updateRef, type TreeWrite } from './api/git';
+import { createBlob, createCommit, createRef, createTree, updateRef, type TreeWrite } from './api/git';
 import { listUserInstallations } from './api/installations';
 import { getBranchHead, getRepo, getTreeRecursive } from './api/repos';
 import { manageInstallationUrl } from './config';
@@ -113,11 +113,26 @@ const provider: SourceContentProvider<GitHubRepoSource> = {
   */
   async writeFiles(source, files: readonly SourceFileWrite[], message): Promise<SourceWriteResult> {
     const { owner, name, defaultBranch } = source;
-    const head = await getBranchHead(owner, name, defaultBranch);
+
+    /*
+      A repository made just to hold the questions has no commits yet. GitHub
+      answers the branch lookup with 409 for that, and the first commit is then
+      a root commit: no base tree, no parent, and the branch has to be created
+      rather than moved. Nothing can be deleted from a repository with nothing
+      in it, so deletions are dropped on that path rather than sent as entries
+      GitHub would refuse.
+    */
+    let head: { commitSha: string; treeSha: string } | null = null;
+    try {
+      head = await getBranchHead(owner, name, defaultBranch);
+    } catch (error) {
+      if (toAppError(error).code !== 'github_repo_empty') throw error;
+    }
 
     const contentHashes: Record<string, string> = {};
+    const writable = head ? files : files.filter((file) => !('delete' in file));
     const entries: TreeWrite[] = await Promise.all(
-      files.map(async (file): Promise<TreeWrite> => {
+      writable.map(async (file): Promise<TreeWrite> => {
         if ('delete' in file) return { path: file.path, sha: null };
         const sha = await createBlob(owner, name, file.content);
         contentHashes[file.path] = sha;
@@ -125,9 +140,14 @@ const provider: SourceContentProvider<GitHubRepoSource> = {
       }),
     );
 
-    const tree = await createTree(owner, name, head.treeSha, entries);
-    const commit = await createCommit(owner, name, { message, tree, parents: [head.commitSha] });
-    await updateRef(owner, name, defaultBranch, commit);
+    const tree = await createTree(owner, name, head?.treeSha ?? null, entries);
+    const commit = await createCommit(owner, name, {
+      message,
+      tree,
+      parents: head ? [head.commitSha] : [],
+    });
+    if (head) await updateRef(owner, name, defaultBranch, commit);
+    else await createRef(owner, name, defaultBranch, commit);
     return { revision: commit, contentHashes };
   },
 };

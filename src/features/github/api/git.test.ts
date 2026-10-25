@@ -1,5 +1,5 @@
 import { AppError } from '../../../lib/errors';
-import { createBlob, createCommit, createTree, updateRef } from './git';
+import { createBlob, createCommit, createRef, createTree, updateRef } from './git';
 
 jest.mock('./client', () => ({ githubRequest: jest.fn() }));
 
@@ -30,6 +30,23 @@ describe('git data api', () => {
         { path: 'quizzes/b.md', mode: '100644', type: 'blob', sha: null },
       ],
     });
+  });
+
+  it('builds a root tree with no base for an empty repository', async () => {
+    githubRequest.mockResolvedValue({ sha: 'tree1' });
+    await createTree('pj', 'quizzes', null, [{ path: 'quizzes/a.md', sha: 'blob1' }]);
+    expect(JSON.parse(githubRequest.mock.calls[0][1].body)).toEqual({
+      tree: [{ path: 'quizzes/a.md', mode: '100644', type: 'blob', sha: 'blob1' }],
+    });
+  });
+
+  it('creates the branch for a first commit', async () => {
+    githubRequest.mockResolvedValue({});
+    await createRef('pj', 'quizzes', 'main', 'commit1');
+    const [path, options] = githubRequest.mock.calls[0];
+    expect(path).toBe('/repos/pj/quizzes/git/refs');
+    expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body)).toEqual({ ref: 'refs/heads/main', sha: 'commit1' });
   });
 
   it('commits with the parent and fast-forwards the branch', async () => {

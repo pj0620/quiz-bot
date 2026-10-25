@@ -39,11 +39,16 @@ export async function createBlob(owner: string, repo: string, content: string): 
 
 export type TreeWrite = { path: string; sha: string | null };
 
-/** A new tree on top of `baseTree`; a null sha removes that path. */
+/**
+ * A new tree on top of `baseTree`; a null sha removes that path.
+ *
+ * `baseTree` is null for a repository with no commits yet, where there is
+ * nothing to build on and the tree holds only what is written now.
+ */
 export async function createTree(
   owner: string,
   repo: string,
-  baseTree: string,
+  baseTree: string | null,
   entries: readonly TreeWrite[],
 ): Promise<string> {
   const tree: GitTreeWriteEntry[] = entries.map((entry) => ({
@@ -53,7 +58,7 @@ export async function createTree(
     sha: entry.sha,
   }));
   const result = await post<GitTreeWriteResponse>(`${repoPath(owner, repo)}/git/trees`, {
-    base_tree: baseTree,
+    ...(baseTree ? { base_tree: baseTree } : {}),
     tree,
   });
   return result.sha;
@@ -86,4 +91,12 @@ export async function updateRef(owner: string, repo: string, branch: string, sha
     }
     throw appError;
   }
+}
+
+/**
+ * Creates a branch pointing at `sha` — the first commit of an empty
+ * repository has no branch to fast-forward, so the ref must be made.
+ */
+export async function createRef(owner: string, repo: string, branch: string, sha: string): Promise<void> {
+  await post(`${repoPath(owner, repo)}/git/refs`, { ref: `refs/heads/${branch}`, sha });
 }
