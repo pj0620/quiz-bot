@@ -160,3 +160,23 @@ export type CommitResponse = {
     author?: { name?: string; date?: string };
   };
 };
+
+// ---------------------------------------------------------------------------
+// Git Data API — used to write, one commit per sync
+// ---------------------------------------------------------------------------
+
+export type GitBlobResponse = { sha: string; url: string };
+
+export type GitTreeWriteEntry = {
+  path: string;
+  mode: '100644';
+  type: 'blob';
+  /** Null deletes the path from the tree. */
+  sha: string | null;
+};
+
+export type GitTreeWriteResponse = { sha: string };
+
+export type GitCommitWriteResponse = { sha: string };
+
+export type GitRefResponse = { ref: string; object: { sha: string; type: string } };

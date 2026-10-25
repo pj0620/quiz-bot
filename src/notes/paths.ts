@@ -15,10 +15,22 @@ const NOTE_EXTENSION = /\.mdx?$/i;
  * around, and template folders are skeletons full of placeholder text that would
  * otherwise generate confident nonsense.
  */
-const SKIP_DIRECTORY = /(^|\/)(\.obsidian|\.trash|\.git|\.github|node_modules|_templates?|templates?|attachments|assets)\//i;
+const SKIP_DIRECTORY = /(^|\/)(\.obsidian|\.trash|\.git|\.github|node_modules|_templates?|templates?|attachments|assets|quizzes)\//i;
 
-/** Vault housekeeping files that happen to be markdown. */
-const SKIP_FILE = /(^|\/)(readme|license|changelog|contributing|index|_index|home|untitled)\.mdx?$/i;
+/**
+ * Vault housekeeping files that happen to be markdown.
+ *
+ * `quiz-questions-*` is the app's own output (see `src/quiz/sync`): a folder
+ * of questions written back into the vault, which must never be read as study
+ * material or the generator would write questions about questions. Matched by
+ * name as well as by the `quizzes` directory above, in case the folder is
+ * moved by hand.
+ */
+const SKIP_FILE =
+  /(^|\/)(readme|license|changelog|contributing|index|_index|home|untitled|quiz-questions-[^/]*)\.mdx?$/i;
+
+/** Where the app writes its question files, relative to the vault root. */
+export const QUIZ_FOLDER = 'quizzes';
 
 export function isNotePath(path: string): boolean {
   if (!NOTE_EXTENSION.test(path)) return false;

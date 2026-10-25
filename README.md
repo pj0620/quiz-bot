@@ -26,7 +26,7 @@ Go to **github.com/settings/apps/new** and configure:
 |---|---|
 | Webhook → Active | **unchecked** |
 | Enable Device Flow | **checked** (without this every poll returns `device_flow_disabled`) |
-| Repository permissions → Contents | **Read-only** (Metadata: Read-only is added automatically) |
+| Repository permissions → Contents | **Read and write** (Metadata: Read-only is added automatically). Write is what lets the app sync its question bank into the vault; see below. |
 | Where can this be installed? | Any account |
 | Optional Features → user-to-server token expiration | **keep enabled** |
 
@@ -76,6 +76,14 @@ Web is not supported — `expo-secure-store` has no web implementation.
 3. **Pick** — the app lists installations and their repos, and the user selects sources.
 4. **Read** — `GET /repos/{o}/{r}/git/trees/{sha}?recursive=1` for the file tree and
    `GET /repos/{o}/{r}/contents/{path}` for file contents.
+5. **Sync** — the question bank is written back into one chosen repository as
+   readable markdown under `quizzes/` (beside the vault's `.obsidian`), one file
+   per batch, one commit per sync via the Git Data API (blob → tree → commit →
+   ref). Write access is a property of the *installation*: after the App's
+   Contents permission is raised to read and write, GitHub asks the installer
+   to accept it on the installation page, and the Settings card links there
+   until they do. Files edited by hand in the vault are never overwritten. See
+   `src/quiz/sync/`.
 
 Tokens live in the **iOS Keychain / Android Keystore** via `expo-secure-store` with
 `WHEN_UNLOCKED_THIS_DEVICE_ONLY`, so they are readable only while the device is unlocked
@@ -95,6 +103,7 @@ src/
   config/env.ts               GitHub App identity from expo.extra
   lib/                        errors, http, kv, query, form, time, createStore
   sources/                    InfoSource union, type registry, persistence
+  quiz/sync/                  the bank as readable notes: grammar, writer/parser, planner, runner
   features/github/
     auth/                     device flow, token lifecycle, secure storage
     api/                      REST client, error classification, endpoints

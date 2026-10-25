@@ -74,3 +74,25 @@ export type FileListing = {
   /** Provider-specific revision marker (a commit SHA for Git). */
   revision?: string;
 };
+
+// ---------------------------------------------------------------------------
+// Writing — only some sources can, and only with permission
+// ---------------------------------------------------------------------------
+
+export type SourceFileWrite = { path: string; content: string } | { path: string; delete: true };
+
+export type SourceWriteResult = {
+  /** The revision the write produced — a commit SHA for Git. */
+  revision: string;
+  /** The content marker now recorded for each written path (a blob SHA). */
+  contentHashes: Record<string, string>;
+};
+
+export type SourceWriteAccess =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: string;
+      /** Where the user can grant the missing access. */
+      manageUrl?: string;
+    };

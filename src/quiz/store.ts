@@ -135,12 +135,13 @@ export function unflagQuestion(questionId: string): void {
  * Caller's job to preserve it; this refuses anything else rather than writing a
  * duplicate under a new id.
  */
-export function updateQuestion(next: Question): boolean {
+export function updateQuestion(next: Question, now = Date.now()): boolean {
   const state = bankStore.get();
   if (!state.questions.some((question) => question.id === next.id)) return false;
 
+  const edited: Question = { ...next, updatedAt: now };
   const questions = state.questions.map((question) =>
-    question.id === next.id ? next : question,
+    question.id === next.id ? edited : question,
   );
   bankStore.set({ questions });
   persistBank(questions);

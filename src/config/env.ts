@@ -45,7 +45,7 @@ export function isGitHubConfigured(): boolean {
 export const GITHUB_SETUP_INSTRUCTIONS = [
   'Create a GitHub App at github.com/settings/apps/new',
   'Enable "Device Flow" in its settings',
-  'Set Repository permissions -> Contents: Read-only',
+  'Set Repository permissions -> Contents: Read and write',
   'Keep user-to-server token expiration ENABLED',
   'Copy the Client ID (Iv23li...) and the app slug from its URL',
   'Paste both into app.json -> expo.extra.github, then restart with: npx expo start -c',

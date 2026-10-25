@@ -34,7 +34,7 @@
     ],
     "extra": {
       "github": {
-        "_comment": "Create a GitHub App at github.com/settings/apps/new. Enable Device Flow. Permissions: Contents=Read-only. Then paste the Client ID (Iv23li...) and the app slug from its URL below. Neither value is a secret; do NOT create a client secret.",
+        "_comment": "Create a GitHub App at github.com/settings/apps/new. Enable Device Flow. Permissions: Contents=Read and write (write is what lets the app sync questions into the vault). Then paste the Client ID (Iv23li...) and the app slug from its URL below. Neither value is a secret; do NOT create a client secret.",
         "clientId": "Iv23licnNVzw1nsUBm9L",
         "appSlug": "quizbot-app"
       },

@@ -24,6 +24,14 @@ describe('isNotePath', () => {
     expect(isNotePath('README.md')).toBe(false);
     expect(isNotePath('docs/LICENSE.md')).toBe(false);
   });
+
+  it("skips the app's own quiz files wherever they sit", () => {
+    // Otherwise the generator reads them back and writes questions about questions.
+    expect(isNotePath('notes/quizzes/quiz-questions-2026-10-23T21-30-00Z.md')).toBe(false);
+    expect(isNotePath('quizzes/README.md')).toBe(false);
+    expect(isNotePath('History/quiz-questions-2026-10-23T21-30-00Z.md')).toBe(false);
+    expect(isNotePath('History/Quizzes in the Classroom.md')).toBe(true);
+  });
 });
 
 describe('noteStem', () => {

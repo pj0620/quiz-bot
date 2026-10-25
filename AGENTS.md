@@ -61,3 +61,21 @@ So do not run `npx expo install --check` or upgrade Expo packages as
 incidental cleanup. Several packages are knowingly behind. Upgrading is its own
 task: regenerate the patch, confirm it applies from a clean install, and expect
 a rebuild.
+
+# Sync
+
+The question bank is written into the connected vault as markdown under
+`quizzes/` (next to `.obsidian`), one file per batch, by `src/quiz/sync/`. Two
+things about it are easy to break:
+
+- `src/notes/paths.ts` skips `quizzes/` and `quiz-questions-*.md`. Without that
+  the generator reads the quiz files back as notes and writes questions about
+  questions. Keep the exclusion if the folder name ever changes.
+- The GitHub App needs Contents: **Read and write**, and the vault's
+  installation has to have accepted that permission (GitHub asks the installer
+  on the installation page). `canWrite` in `githubSourceType.ts` checks the
+  installation, not the token.
+
+A quiz file the user edited by hand is never rewritten; the ledger
+(`quizbot.sync.ledger.v1`) records the blob SHA the app wrote last and skips
+anything that differs. Import is the only thing that unfreezes such a file.
