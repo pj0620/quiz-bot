@@ -1,8 +1,17 @@
 import { getGitHubConfig } from '../../config/env';
 import { AppError, toAppError } from '../../lib/errors';
 import type { SourceContentProvider, SourceTypeDefinition } from '../../sources/contract';
-import type { FileListing, GitHubRepoSource, SourceHealth } from '../../sources/types';
+import type {
+  FileListing,
+  GitHubRepoSource,
+  SourceFileWrite,
+  SourceHealth,
+  SourceWriteAccess,
+  SourceWriteResult,
+} from '../../sources/types';
 import { getFileRaw } from './api/contents';
+import { createBlob, createCommit, createTree, updateRef, type TreeWrite } from './api/git';
+import { listUserInstallations } from './api/installations';
 import { getBranchHead, getRepo, getTreeRecursive } from './api/repos';
 import { manageInstallationUrl } from './config';
 
@@ -68,6 +77,58 @@ const provider: SourceContentProvider<GitHubRepoSource> = {
       ref: options.ref ?? source.defaultBranch,
       signal: options.signal,
     });
+  },
+
+  /*
+    Write access is a property of the INSTALLATION, not of the token. The App
+    asks for Contents: read and write, but an installation made when it only
+    asked for read keeps read until the owner accepts the new permission on
+    GitHub's installation page — so this looks the installation up rather than
+    trying a write and reading the 403.
+  */
+  async canWrite(source): Promise<SourceWriteAccess> {
+    const installations = await listUserInstallations();
+    const installation = installations.find((entry) => entry.id === source.installationId);
+    const config = getGitHubConfig();
+    if (!installation) {
+      return {
+        ok: false,
+        reason: 'QuizBot is no longer installed for this repository.',
+        manageUrl: config ? manageInstallationUrl(config.appSlug) : undefined,
+      };
+    }
+    if (installation.permissions?.contents === 'write') return { ok: true };
+    return {
+      ok: false,
+      reason: 'QuizBot can read this repository but has not been granted write access yet.',
+      manageUrl: manageInstallationUrl(config?.appSlug ?? '', installation.html_url),
+    };
+  },
+
+  /*
+    One commit for the whole set: blobs, then a tree on the branch's current
+    tree, then a commit whose parent is the branch head, then a fast-forward of
+    the branch. If someone pushed in between, the last step refuses and the
+    caller re-plans from a fresh listing rather than overwriting their work.
+  */
+  async writeFiles(source, files: readonly SourceFileWrite[], message): Promise<SourceWriteResult> {
+    const { owner, name, defaultBranch } = source;
+    const head = await getBranchHead(owner, name, defaultBranch);
+
+    const contentHashes: Record<string, string> = {};
+    const entries: TreeWrite[] = await Promise.all(
+      files.map(async (file): Promise<TreeWrite> => {
+        if ('delete' in file) return { path: file.path, sha: null };
+        const sha = await createBlob(owner, name, file.content);
+        contentHashes[file.path] = sha;
+        return { path: file.path, sha };
+      }),
+    );
+
+    const tree = await createTree(owner, name, head.treeSha, entries);
+    const commit = await createCommit(owner, name, { message, tree, parents: [head.commitSha] });
+    await updateRef(owner, name, defaultBranch, commit);
+    return { revision: commit, contentHashes };
   },
 };
 

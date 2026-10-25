@@ -101,6 +101,14 @@ export type QuestionBase = {
    * material, and conflating the two makes "recently added" meaningless.
    */
   contentAt?: number;
+  /**
+   * When the reader last edited this question by hand. Absent until they do.
+   *
+   * Informational only: the id, which keys everything else, does not change on
+   * an edit (see `updateQuestion`). What this buys is an honest "Edited" line
+   * in the notes the bank is synced to.
+   */
+  updatedAt?: number;
   /** Set by "report a bad question". Excluded from selection while present. */
   flagged?: FlagRecord;
   /**

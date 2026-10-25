@@ -10,6 +10,7 @@ import { startAppStateTracking } from '../src/lib/appState';
 import { initPlanWatcher } from '../src/quiz/builder/watcher';
 import { initBackgroundResume } from '../src/quiz/generation/backgroundResume';
 import { ensureBuiltinQuizzes } from '../src/quiz/store';
+import { initSyncTriggers } from '../src/quiz/sync/triggers';
 import { ensureBuiltinThemes } from '../src/quiz/vocab/preferences';
 import { CrtOverlay } from '../src/ui/components/CrtOverlay';
 import { immersiveScreenOptions, stackScreenOptions } from '../src/ui/navigation/screenOptions';
@@ -63,6 +64,12 @@ initBackgroundResume();
   the background. See `src/quiz/builder/watcher.ts`.
 */
 initPlanWatcher();
+
+/*
+  Writes the question bank into the notes vault a little after it changes,
+  once a repository has been chosen in Settings. See `src/quiz/sync`.
+*/
+initSyncTriggers();
 
 /**
  * Anchors every route to the tabs.

@@ -1,7 +1,15 @@
 import type { ComponentProps } from 'react';
 import type { Ionicons } from '@expo/vector-icons';
 
-import type { FileListing, InfoSource, InfoSourceType, SourceHealth } from './types';
+import type {
+  FileListing,
+  InfoSource,
+  InfoSourceType,
+  SourceFileWrite,
+  SourceHealth,
+  SourceWriteAccess,
+  SourceWriteResult,
+} from './types';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -45,4 +53,16 @@ export type SourceContentProvider<T extends InfoSource = InfoSource> = {
     path: string,
     options?: { ref?: string; signal?: AbortSignal },
   ): Promise<string>;
+
+  /**
+   * Whether this credential may write to the source right now. Optional with
+   * `writeFiles`: a source that cannot be written to simply leaves both out,
+   * and the sync screen says so instead of failing on the first commit.
+   */
+  canWrite?(source: T): Promise<SourceWriteAccess>;
+  /**
+   * Writes and deletes a set of files as ONE revision — for Git, one commit —
+   * so a sync is all-or-nothing and the history reads as one change.
+   */
+  writeFiles?(source: T, files: readonly SourceFileWrite[], message: string): Promise<SourceWriteResult>;
 };

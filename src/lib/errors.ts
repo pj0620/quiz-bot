@@ -16,6 +16,7 @@ export type AppErrorCode =
   | 'github_not_found'
   | 'github_repo_empty'
   | 'github_server_error'
+  | 'github_write_conflict'
   | 'llm_not_configured'
   | 'llm_unauthorized'
   | 'llm_rate_limited'
@@ -52,6 +53,7 @@ const DEFAULT_MESSAGES: Record<AppErrorCode, string> = {
   github_not_found: "That repository isn't available. It may have been renamed, deleted, or removed from QuizBot's access.",
   github_repo_empty: 'This repository is empty — there are no files to read yet.',
   github_server_error: 'GitHub is having trouble right now. Try again shortly.',
+  github_write_conflict: 'The repository changed while QuizBot was writing. Try again.',
   llm_not_configured: 'Add an API key in Settings before generating questions.',
   llm_unauthorized: 'That API key was rejected. Check it in Settings.',
   llm_rate_limited: "You've hit the provider's rate limit. Try again shortly.",
@@ -69,6 +71,7 @@ const RETRYABLE: ReadonlySet<AppErrorCode> = new Set<AppErrorCode>([
   'timeout',
   'github_secondary_rate_limit',
   'github_server_error',
+  'github_write_conflict',
   'llm_rate_limited',
   'llm_server_error',
   // Models are non-deterministic, so a reply that couldn't be parsed genuinely

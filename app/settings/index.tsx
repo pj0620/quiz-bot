@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -70,9 +71,21 @@ import {
   WORDS_PER_BATCH_CHOICES,
 } from '../../src/quiz/vocab/preferences';
 import { useQuestions } from '../../src/quiz/useQuiz';
+import { runSync, useSyncStatus } from '../../src/quiz/sync/run';
+import {
+  normalizeFolder,
+  setSyncAuto,
+  setSyncFolder,
+  setSyncSource,
+  useSyncSettings,
+} from '../../src/quiz/sync/settings';
 import type { Grade, Question } from '../../src/quiz/types';
+import { relativeTime } from '../../src/lib/time';
+import { getSourceType } from '../../src/sources/registry';
+import { useSources } from '../../src/sources/useSources';
 import { Badge } from '../../src/ui/components/Badge';
 import { Button } from '../../src/ui/components/Button';
+import { Callout } from '../../src/ui/components/Callout';
 import { Card } from '../../src/ui/components/Card';
 import { Chip, ChipGroup } from '../../src/ui/components/Chip';
 import { Disclosure } from '../../src/ui/components/Disclosure';
@@ -899,6 +912,144 @@ function QuestionBankCard() {
 }
 
 /** Where the app's look is chosen. One row — the picker is its own screen. */
+/**
+ * Where the question bank is written as notes.
+ *
+ * The bank lives in one value on one phone. Syncing writes it into a connected
+ * repository as markdown a person can read — one file per batch, with the
+ * answers, where each question came from, and how the reader is doing — so it
+ * sits in their vault and outlives the device. See `src/quiz/sync`.
+ *
+ * Write access is a property of the GitHub installation, so the first thing
+ * this card may say is that it has not been granted yet, with the one link
+ * that fixes it.
+ */
+function SyncCard() {
+  const sources = useSources();
+  const settings = useSyncSettings();
+  const status = useSyncStatus();
+  const target = settings.sourceId ? sources.find((source) => source.id === settings.sourceId) : undefined;
+  const folder = settings.folder ?? status.folder;
+
+  // One connected repository and nothing chosen: that is the choice.
+  useEffect(() => {
+    if (!settings.sourceId && sources.length === 1) setSyncSource(sources[0].id);
+  }, [settings.sourceId, sources]);
+
+  const changeFolder = useCallback(() => {
+    Alert.prompt(
+      'Folder',
+      'Inside the repository, from its root. Changing it starts a fresh set of files; the old folder is left as it is.',
+      (text) => setSyncFolder(normalizeFolder(text ?? '')),
+      'plain-text',
+      folder ?? '',
+    );
+  }, [folder]);
+
+  const openOnGitHub = useCallback(() => {
+    if (!target || !folder) return;
+    const url = `https://github.com/${target.fullName}/tree/${target.defaultBranch}/${folder}`;
+    void WebBrowser.openBrowserAsync(url);
+  }, [target, folder]);
+
+  let summary: string;
+  if (status.running) summary = status.phase === 'writing' ? 'Writing to GitHub…' : 'Checking…';
+  else if (status.lastSyncAt) {
+    summary =
+      `Last synced ${relativeTime(status.lastSyncAt)} · ${status.questionCount} question${status.questionCount === 1 ? '' : 's'}` +
+      ` in ${status.fileCount} file${status.fileCount === 1 ? '' : 's'}`;
+    if (status.unwritable > 0) summary += ` · ${status.unwritable} could not be written`;
+  } else summary = 'Not synced yet.';
+
+  return (
+    <Card title="Sync to GitHub" icon="cloud-upload-outline" accent="primary">
+      <Text style={styles.hint}>
+        Writes your question bank into a repository you connected, as notes you can read —
+        one file per batch, with the answers, where each came from, and your progress.
+      </Text>
+
+      {sources.length === 0 ? (
+        <Text style={styles.hint}>Connect a repository from the Sources tab first.</Text>
+      ) : (
+        sources.map((source) => {
+          const definition = getSourceType(source);
+          const selected = source.id === settings.sourceId;
+          return (
+            <ListRow
+              key={source.id}
+              title={definition.getTitle(source)}
+              subtitle={definition.getSubtitle(source)}
+              icon={selected ? 'radio-button-on' : 'radio-button-off'}
+              onPress={() => setSyncSource(source.id)}
+            />
+          );
+        })
+      )}
+
+      {target ? (
+        <>
+          <View style={styles.geoRow}>
+            <View style={styles.geoText}>
+              <Text style={styles.geoLabel}>Folder</Text>
+              <Text style={styles.geoCount}>{folder ?? 'Chosen on the first sync, beside .obsidian'}</Text>
+            </View>
+            <Button title="Change" variant="plain" onPress={changeFolder} />
+          </View>
+
+          <View style={styles.geoRow}>
+            <View style={styles.geoText}>
+              <Text style={styles.geoLabel}>Sync automatically</Text>
+              <Text style={styles.geoCount}>About half a minute after you answer, add or edit questions.</Text>
+            </View>
+            <Switch value={settings.auto} onValueChange={setSyncAuto} accessibilityLabel="Sync automatically" />
+          </View>
+
+          {status.phase === 'no-write-access' ? (
+            <Callout
+              tone="warning"
+              title="Write access needed"
+              message={
+                status.reason ??
+                'QuizBot can read this repository but has not been granted write access yet.'
+              }
+            >
+              {status.manageUrl ? (
+                <Button
+                  title="Grant write access on GitHub"
+                  variant="secondary"
+                  onPress={() => void WebBrowser.openBrowserAsync(status.manageUrl as string)}
+                />
+              ) : null}
+            </Callout>
+          ) : null}
+
+          {status.error ? (
+            <Callout tone="danger" title="Sync failed" message={status.error.message} />
+          ) : null}
+
+          {status.skipped.length > 0 ? (
+            <Callout
+              tone="info"
+              title={`${status.skipped.length} file${status.skipped.length === 1 ? '' : 's'} edited in your notes`}
+              message={
+                `Left alone so your edits are not lost: ${status.skipped
+                  .map((file) => file.path.split('/').pop())
+                  .join(', ')}.`
+              }
+            />
+          ) : null}
+
+          <Text style={styles.resultMeta}>{summary}</Text>
+          <View style={styles.row}>
+            <Button title="Sync now" onPress={() => void runSync()} loading={status.running} />
+            <Button title="Open on GitHub" variant="secondary" onPress={openOnGitHub} disabled={!folder} />
+          </View>
+        </>
+      ) : null}
+    </Card>
+  );
+}
+
 function AppearanceCard() {
   const router = useRouter();
   const themeName = useThemeName();
@@ -928,6 +1079,7 @@ export default function SettingsScreen() {
         <GeographyCard />
         <CalendarCard />
         <VocabCard />
+        <SyncCard />
         <QuestionBankCard />
       </Screen>
     </>
