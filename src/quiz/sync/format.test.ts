@@ -34,10 +34,20 @@ import {
   asPlain,
 } from './markdown';
 
-process.env.TZ = 'America/New_York';
-
+/*
+  Local-time fixtures, and expectations computed the same way rather than
+  written out with an offset: the suite has to pass on an EAS worker in UTC as
+  well as on a laptop in New York. (Setting process.env.TZ inside a test file
+  does not change the timezone under jest.)
+*/
 const NOW = new Date(2026, 9, 23, 21, 30, 0).getTime();
 const CREATED = new Date(2026, 9, 20, 14, 2, 11).getTime();
+const OFFSET = /[+-]\d\d:\d\d/.source;
+
+/** `2026-10-23T21-30-00Z` for whatever instant NOW is in this timezone. */
+function utcStamp(ms: number): string {
+  return `${new Date(ms).toISOString().slice(0, 19).replace(/:/g, '-')}Z`;
+}
 
 const meta = { createdAt: NOW, planTitle: (id: string) => (id === 'plan-1' ? 'Civil War deep dive' : undefined) };
 
@@ -435,7 +445,9 @@ describe('review state', () => {
   it('round-trips a first review, a partial, a leech and extreme values', () => {
     const text = roundTrip({ question: mcq, review: first });
     expect(text).toContain('- Progress: answered 1 · missed 0 · streak 1 · Learning');
-    expect(text).toMatch(/- Schedule: last 2026-10-20T14:02:11-04:00 \(correct\) · due 2026-10-21 · interval 1\.\d\d days · ease 2\.60/);
+    expect(text).toMatch(
+      new RegExp(`- Schedule: last 2026-10-20T14:02:11${OFFSET} \\(correct\\) · due 2026-10-21 · interval 1\\.\\d\\d days · ease 2\\.60`),
+    );
 
     const partial = recordReview(first, mcq.id, 'partial', CREATED + 86_400_000);
     roundTrip({ question: mcq, review: partial });
@@ -513,7 +525,7 @@ describe('file level', () => {
   });
 
   it('names files by UTC stamp', () => {
-    expect(quizFilePath('notes/quizzes', NOW)).toBe('notes/quizzes/quiz-questions-2026-10-24T01-30-00Z.md');
+    expect(quizFilePath('notes/quizzes', NOW)).toBe(`notes/quizzes/quiz-questions-${utcStamp(NOW)}.md`);
   });
 });
 
@@ -596,7 +608,7 @@ describe('markdown helpers', () => {
   });
 
   it('formats dates with the local offset and reads them back', () => {
-    expect(formatIso(CREATED)).toBe('2026-10-20T14:02:11-04:00');
+    expect(formatIso(CREATED)).toMatch(new RegExp(`^2026-10-20T14:02:11${OFFSET}$`));
     expect(parseIso(formatIso(CREATED))).toBe(CREATED);
     expect(parseIso('2026-10-20')).toBeUndefined();
     expect(parseDay(formatDay(CREATED))).toBe(new Date(2026, 9, 20).getTime());
