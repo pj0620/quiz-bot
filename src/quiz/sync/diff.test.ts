@@ -2,10 +2,14 @@ import type { MultipleChoiceQuestion, ReviewState } from '../types';
 import { recordReview } from '../srs/schedule';
 import { applySyncResult, describeSync, emptyLedger, planSync, type SyncLedger } from './diff';
 
-process.env.TZ = 'America/New_York';
-
+// Local-time fixtures; filenames are derived from them so the suite passes in
+// any timezone (an EAS worker runs in UTC).
 const NOW = new Date(2026, 9, 23, 21, 30, 0).getTime();
 const LATER = NOW + 3_600_000;
+
+function utcStamp(ms: number): string {
+  return `${new Date(ms).toISOString().slice(0, 19).replace(/:/g, '-')}Z`;
+}
 
 function question(id: string, addedAt = NOW): MultipleChoiceQuestion {
   return {
@@ -27,7 +31,7 @@ function question(id: string, addedAt = NOW): MultipleChoiceQuestion {
 }
 
 const FOLDER = 'notes/quizzes';
-const FIRST_FILE = `${FOLDER}/quiz-questions-2026-10-24T01-30-00Z.md`;
+const FIRST_FILE = `${FOLDER}/quiz-questions-${utcStamp(NOW)}.md`;
 
 /** Runs a plan and pretends the repo accepted it, returning the new ledger and tree. */
 function commit(ledger: SyncLedger, plan: ReturnType<typeof planSync>, tree: Record<string, string>, now: number) {
@@ -168,7 +172,7 @@ describe('planSync', () => {
       tree: { [FIRST_FILE]: 'someone-else' },
       now: NOW,
     });
-    expect(plan.writes[0].path).toBe(`${FOLDER}/quiz-questions-2026-10-24T01-30-01Z.md`);
+    expect(plan.writes[0].path).toBe(`${FOLDER}/quiz-questions-${utcStamp(NOW + 1000)}.md`);
   });
 
   it('writes no file for questions the format cannot hold', () => {
